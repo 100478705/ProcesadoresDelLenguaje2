@@ -1,0 +1,122 @@
+Created by PLY version 3.11 (http://www.dabeaz.com/ply)
+
+Unused terminals:
+
+    CE
+    CS
+    DEF
+    ELSE
+    FALSE
+    IF
+    LLE
+    LLS
+    RETURN
+    TRUE
+    TYPE
+    WHILE
+
+Grammar
+
+Rule 0     S' -> programa
+Rule 1     programa -> expresion NEWLINE programa
+Rule 2     programa -> NEWLINE programa
+Rule 3     programa -> <empty>
+Rule 4     expresion -> tipo ID EQ expresion
+Rule 5     expresion -> ID EQ expresion
+Rule 6     tipo -> INT
+Rule 7     tipo -> FLOAT
+Rule 8     tipo -> BOOL
+Rule 9     tipo -> CHAR
+Rule 10    expresion -> expresion OR expresion_logica
+Rule 11    expresion -> expresion_logica
+Rule 12    expresion_logica -> expresion_logica AND expresion_relacional
+Rule 13    expresion_logica -> expresion_relacional
+Rule 14    expresion_relacional -> termino_aritmetico I termino_aritmetico
+Rule 15    expresion_relacional -> termino_aritmetico M termino_aritmetico
+Rule 16    expresion_relacional -> termino_aritmetico m termino_aritmetico
+Rule 17    expresion_relacional -> termino_aritmetico MI termino_aritmetico
+Rule 18    expresion_relacional -> termino_aritmetico mI termino_aritmetico
+Rule 19    expresion_relacional -> termino_aritmetico
+Rule 20    termino_aritmetico -> termino_aritmetico SUM factor
+Rule 21    termino_aritmetico -> termino_aritmetico RES factor
+Rule 22    termino_aritmetico -> factor
+Rule 23    factor -> factor MUL elemento
+Rule 24    factor -> factor DIV elemento
+Rule 25    factor -> elemento
+Rule 26    elemento -> ENTERO_DECIMAL
+Rule 27    elemento -> ENTERO_BINARIO
+Rule 28    elemento -> ENTERO_OCTAL
+Rule 29    elemento -> ENTERO_HEXADECIMAL
+Rule 30    elemento -> REAL_DECIMAL
+Rule 31    elemento -> REAL_CIENTIFICO
+Rule 32    elemento -> BOOLEANO
+Rule 33    elemento -> CARACTER
+Rule 34    elemento -> ID
+Rule 35    elemento -> PE expresion PS
+Rule 36    elemento -> RES elemento
+Rule 37    elemento -> NOT elemento
+Rule 38    expresion -> SEN PE expresion PS
+Rule 39    expresion -> COS PE expresion PS
+Rule 40    expresion -> EXP PE expresion PS
+Rule 41    expresion -> LOG PE expresion PS
+
+Terminals, with rules where they appear
+
+AND                  : 12
+BOOL                 : 8
+CARACTER             : 33
+CE                   : 
+CHAR                 : 9
+COS                  : 39
+CS                   : 
+DEF                  : 
+DIV                  : 24
+ELSE                 : 
+ENTERO_BINARIO       : 27
+ENTERO_DECIMAL       : 26
+ENTERO_HEXADECIMAL   : 29
+ENTERO_OCTAL         : 28
+EQ                   : 4 5
+EXP                  : 40
+FALSE                : 
+FLOAT                : 7
+I                    : 14
+ID                   : 4 5 34
+IF                   : 
+INT                  : 6
+LLE                  : 
+LLS                  : 
+LOG                  : 41
+M                    : 15
+MI                   : 17
+MUL                  : 23
+NEWLINE              : 1 2
+NOT                  : 37
+OR                   : 10
+PE                   : 35 38 39 40 41
+PS                   : 35 38 39 40 41
+REAL_CIENTIFICO      : 31
+REAL_DECIMAL         : 30
+RES                  : 21 36
+RETURN               : 
+SEN                  : 38
+SUM                  : 20
+TRUE                 : 
+TYPE                 : 
+WHILE                : 
+error                : 
+m                    : 16
+mI                   : 18
+
+Nonterminals, with rules where they appear
+
+BOOLEANO             : 32
+elemento             : 23 24 25 36 37
+expresion            : 1 4 5 10 35 38 39 40 41
+expresion_logica     : 10 11 12
+expresion_relacional : 12 13
+factor               : 20 21 22 23 24
+programa             : 1 2 0
+termino_aritmetico   : 14 14 15 15 16 16 17 17 18 18 19 20 21
+tipo                 : 4
+
