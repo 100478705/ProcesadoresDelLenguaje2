@@ -6,7 +6,6 @@ class LexerClass:
         ('comment', 'exclusive'),
     )
 
-    # Palabras reservadas
     reserved = {
         'int': 'INT',
         'float': 'FLOAT',
@@ -22,10 +21,13 @@ class LexerClass:
         'and': 'AND',
         'or': 'OR',
         'not': 'NOT',
-        'while': 'WHILE'
+        'while': 'WHILE',
+        'sin': 'SEN',
+        'cos': 'COS',
+        'log': 'LOG',
+        'exp': 'EXP'
     }
 
-    # Listado de todos los tokens
     tokens = (
         'ENTERO_DECIMAL',
         'ENTERO_BINARIO',
@@ -38,10 +40,6 @@ class LexerClass:
         'RES',
         'MUL',
         'DIV',
-        'EXP',
-        'LOG',
-        'SEN',
-        'COS',
         'NEWLINE',
         'ID',
         'I',
@@ -56,19 +54,13 @@ class LexerClass:
         'CE',
         'CS',
         'EQ',
-    ) + tuple(reserved.values())  # Las palabras reservadas
+    ) + tuple(reserved.values())
 
-    # Reglas de expresión regular para los tokens
     t_EQ = r'='
     t_SUM = r'\+'
     t_RES = r'\-'
     t_MUL = r'\*'
     t_DIV = r'/'
-
-    t_EXP = r'exp(?=\s|$)'
-    t_LOG = r'log(?=\s|$)'
-    t_SEN = r'sin(?=\s|$)'
-    t_COS = r'cos(?=\s|$)'
 
     t_I = r'=='
     t_M = r'>'
@@ -87,7 +79,7 @@ class LexerClass:
         r'0b[01]+'
         t.value = int(t.value[2:], 2)
         return t
-    
+
     @staticmethod
     def t_ENTERO_OCTAL(t):
         r'0o[0-7]+'
@@ -120,11 +112,10 @@ class LexerClass:
 
     @staticmethod
     def t_CARACTER(t):
-        r"'[ -~¡-ÿ]'"
+        r"'[^']{1}'"
         t.value = t.value[1:-1]
         return t
 
-    # Comentarios
     @staticmethod
     def t_COM(t):
         r'\#.*'
@@ -136,7 +127,6 @@ class LexerClass:
         t.lexer.begin('comment')
         pass
 
-    # Reglas para estado comment
     @staticmethod
     def t_comment_COMMLfin(t):
         r"'''"
@@ -153,7 +143,7 @@ class LexerClass:
 
     @staticmethod
     def t_comment_error(t):
-        pass  # Ignorar todos los caracteres en comentarios
+        pass
 
     @staticmethod
     def t_error(t):
@@ -171,7 +161,7 @@ class LexerClass:
     @staticmethod
     def t_ID(t):
         r'[a-zA-Z_][a-zA-Z_0-9]*'
-        t.type = LexerClass.reserved.get(t.value, 'ID')  # Verifica si es palabra reservada
+        t.type = LexerClass.reserved.get(t.value, 'ID')
         return t
 
     def __init__(self):        
