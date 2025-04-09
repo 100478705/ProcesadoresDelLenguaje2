@@ -1,6 +1,8 @@
-int a = 0xA
-float b = 3.5e2
-a = a + 10
-float c = sin(0.5) + log(1)
-bool x = a > b or false
-char h = 'a'
+int a = 5
+int b = 2
+int c
+if a > b:
+    c = 1
+else:
+    c = 0
+c

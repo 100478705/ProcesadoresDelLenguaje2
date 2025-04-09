@@ -18,8 +18,6 @@ class LexerClass:
         'type': 'TYPE',
         'if': 'IF',
         'else': 'ELSE',
-        'and': 'AND',
-        'or': 'OR',
         'not': 'NOT',
         'while': 'WHILE',
         'sin': 'SEN',
@@ -54,25 +52,45 @@ class LexerClass:
         'CE',
         'CS',
         'EQ',
+        'COMA',
+        'PNTO',
+        'LEN',
+        'AND',
+        'OR',
+        'TAB',
+        'DPNTO'
     ) + tuple(reserved.values())
+    t_ignore = ' '
 
     t_EQ = r'='
     t_SUM = r'\+'
     t_RES = r'\-'
     t_MUL = r'\*'
     t_DIV = r'/'
+    t_COMA = r','
+    t_PNTO = r'\.'
+    t_DPNTO = r':'
+    t_TAB = r'\t+'
 
     t_I = r'=='
     t_M = r'>'
     t_m = r'<'
     t_MI = r'>='
     t_mI = r'<='
+    t_AND = r'\&\&'
+    t_OR = r'\|\|'
+
     t_LLE = r'{'
     t_LLS = r'}'
     t_CE = r'\['
     t_CS = r'\]'
     t_PE = r'\('
     t_PS = r'\)'
+
+    t_LEN = r'len'
+
+
+
 
     @staticmethod
     def t_ENTERO_BINARIO(t):
@@ -150,7 +168,6 @@ class LexerClass:
         print(f"Carácter ilegal, ERROR LEXICO:'{t.value[0]}'")
         t.lexer.skip(1)
 
-    t_ignore = ' \t'
 
     @staticmethod
     def t_NEWLINE(t):
