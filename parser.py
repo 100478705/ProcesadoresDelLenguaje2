@@ -206,7 +206,119 @@ class ParserClass:
                 self.entorno[nombre] = valor
                 p[0] = f"Variable '{nombre}' actualizada a {valor}"
 
+#region Registros
+    #region Declaración de Tipo de Registro
+    def p_declaracion_tipo_registro(self, p):
+        '''expresion : TYPE ID DPNTO NEWLINE bloque_propiedades'''
+        type_name = p[2]
+        propiedades = p[5]  # Diccionario: {nombre_propiedad: tipo}
+        if not hasattr(self, 'tipos_registro'):
+            self.tipos_registro = {}
+        if type_name in self.tipos_registro:
+            p[0] = f"Error: Tipo de registro '{type_name}' ya ha sido declarado"
+            return
+        self.tipos_registro[type_name] = propiedades
+        p[0] = f"Tipo de registro '{type_name}' declarado con propiedades: {list(propiedades.keys())}"
 
+    def p_bloque_propiedades(self, p):
+        '''bloque_propiedades : propiedad
+                            | propiedad bloque_propiedades'''
+        if len(p) == 2:
+            p[0] = p[1]
+        else:
+            p[1].update(p[2])
+            p[0] = p[1]
+
+    def p_propiedad(self, p):
+        '''propiedad : TAB tipo lista_ids NEWLINE'''
+        tipo_prop = p[2]
+        lista = p[3]  # Lista de identificadores
+        propiedades = {}
+        for ident in lista:
+            propiedades[ident] = tipo_prop
+        p[0] = propiedades
+
+    def p_lista_ids(self, p):
+        '''lista_ids : ID
+                    | ID COMA lista_ids'''
+        if len(p) == 2:
+            p[0] = [p[1]]
+        else:
+            p[0] = [p[1]] + p[3]
+    #endregion
+    #region Declaración de Variable de Registro
+    # ------------------ Declaración de Variable de Registro ------------------
+    def p_declaracion_registro(self, p):
+        '''expresion : ID ID'''
+        record_type = p[1]
+        var_name = p[2]
+        if not hasattr(self, 'tipos_registro'):
+            self.tipos_registro = {}
+        if record_type not in self.tipos_registro:
+            p[0] = f"Error: El tipo de registro '{record_type}' no ha sido declarado"
+            return
+        propiedades = self.tipos_registro[record_type]
+        # Inicializar las propiedades con sus valores por defecto
+        instance = {}
+        for prop, tip in propiedades.items():
+            if tip == 'int':
+                instance[prop] = 0
+            elif tip == 'float':
+                instance[prop] = 0.0
+            elif tip == 'bool':
+                instance[prop] = False
+            elif tip == 'char':
+                instance[prop] = '\u0000'
+            else:
+                instance[prop] = None  # Para tipos complejos se inicializa en None
+        self.entorno[var_name] = {
+            'type': 'registro',
+            'tipo_registro': record_type,
+            'props': instance
+        }
+        p[0] = f"Registro '{var_name}' de tipo '{record_type}' declarado"
+
+    #endregion
+    #region Acceso a Propiedades de Registro
+    def p_expresion_acceso_registro(self, p):
+        '''expresion : ID PNTO ID'''
+        var = p[1]
+        prop = p[3]
+        if var not in self.entorno:
+            p[0] = f"Error: Variable '{var}' no declarada"
+            return
+        registro = self.entorno[var]
+        if not (isinstance(registro, dict) and registro.get('type') == 'registro'):
+            p[0] = f"Error: '{var}' no es un registro"
+            return
+        if prop not in registro.get('props', {}):
+            p[0] = f"Error: La propiedad '{prop}' no existe en el registro '{var}'"
+            return
+        p[0] = registro['props'][prop]
+    #endregion
+    #region Asignación a Propiedades de Registro
+    # ------------------ Asignación a Propiedades de Registro ------------------
+    def p_asignacion_propiedad_registro(self, p):
+        '''expresion : ID PNTO ID EQ expresion'''
+        var = p[1]
+        prop = p[3]
+        valor = p[5]
+        if var not in self.entorno:
+            p[0] = f"Error: Variable '{var}' no declarada"
+            return
+        registro = self.entorno[var]
+        if not (isinstance(registro, dict) and registro.get('type') == 'registro'):
+            p[0] = f"Error: '{var}' no es un registro"
+            return
+        if prop not in registro.get('props', {}):
+            p[0] = f"Error: La propiedad '{prop}' no existe en el registro '{var}'"
+            return
+        registro['props'][prop] = valor
+        p[0] = f"Propiedad '{prop}' de registro '{var}' actualizada a {valor}"
+
+    #endregion
+
+#endregion
 
 
 
@@ -419,3 +531,5 @@ class ParserClass:
             except Exception as e:
                 print(f"Error durante el análisis: {e}")
                 return None
+
+
