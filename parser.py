@@ -212,10 +212,9 @@ class ParserClass:
 
 #-------------------------IF-ELSE-------------------------
     def p_expresion_if_simple(self, p):
-        '''expresion : IF expresion DPNTO NEWLINE bloque_tabulado'''
-        print("DEBUG - Resultado condición if:", p[2])  # 👈 esto imprime el valor real
+        '''expresion : IF expresion bloque'''
         if isinstance(p[2], bool) and p[2]:
-            for sentencia in p[5]:
+            for sentencia in p[3]:
                 self.parser.parse(sentencia, lexer=self.lexer.lexerObj)
             p[0] = "If ejecutado: True"
         else:
@@ -223,29 +222,47 @@ class ParserClass:
 
 
     def p_expresion_if_else(self, p):
-        '''expresion : IF expresion DPNTO NEWLINE bloque_tabulado ELSE DPNTO NEWLINE bloque_tabulado'''
-        print("DEBUG - Resultado condición if-else:", p[2])  
+        '''expresion : IF expresion bloque ELSE bloque'''
         if isinstance(p[2], bool) and p[2]:
-            for sentencia in p[5]:
+            for sentencia in p[3]:
                 self.parser.parse(sentencia, lexer=self.lexer.lexerObj)
             p[0] = "If ejecutado: True"
         else:
-            for sentencia in p[9]:
+            for sentencia in p[5]:
                 self.parser.parse(sentencia, lexer=self.lexer.lexerObj)
             p[0] = "Else ejecutado"
 
-    def p_bloque_tabulado(self, p):
-        '''bloque_tabulado : linea_tabulada
-                        | linea_tabulada bloque_tabulado'''
-        if len(p) == 2:
+    def p_expresion_while(self, p):
+        '''expresion : WHILE expresion bloque'''
+        while isinstance(p[2], bool) and p[2]:
+            for sentencia in p[3]:
+                self.parser.parse(sentencia, lexer=self.lexer.lexerObj)
+        p[0] = "Bucle while finalizado"
+
+
+    def p_bloque_llaves(self, p):
+        '''bloque : LLE expresiones LLA
+                | NEWLINE LLE expresiones LLA
+                | LLE NEWLINE expresiones LLA
+                | LLE expresiones NEWLINE LLA
+                | NEWLINE LLE NEWLINE expresiones LLA
+                | LLE NEWLINE expresiones NEWLINE LLA
+                | NEWLINE LLE expresiones NEWLINE LLA
+                | NEWLINE LLE NEWLINE expresiones NEWLINE LLA'''
+        # Siempre devolvemos las expresiones
+        for i in p:
+            if isinstance(i, list):
+                p[0] = i
+                break
+
+
+    def p_expresiones(self, p):
+        '''expresiones : expresion NEWLINE
+                    | expresion NEWLINE expresiones'''
+        if len(p) == 3:
             p[0] = [p[1]]
         else:
-            p[0] = [p[1]] + p[2]
-
-    def p_linea_tabulada(self, p):
-        '''linea_tabulada : TAB expresion NEWLINE'''
-        # Guardamos la línea como string para pasarla dentro del if/else
-        p[0] = p[2]
+            p[0] = [p[1]] + p[3]
 #-----------------------------------------------------------
 
 

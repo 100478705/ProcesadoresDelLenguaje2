@@ -27,12 +27,8 @@ class LexerClass:
     }
 
     tokens = (
-        'ENTERO_DECIMAL',
-        'ENTERO_BINARIO',
-        'ENTERO_OCTAL',
-        'ENTERO_HEXADECIMAL',
-        'REAL_DECIMAL',
-        'REAL_CIENTIFICO',
+        'ENTERO',
+        'REAL',
         'CARACTER',
         'SUM',
         'RES',
@@ -46,21 +42,20 @@ class LexerClass:
         'm',
         'mI',
         'LLE',
-        'LLS',
+        'LLA',
         'PE',
-        'PS',
+        'PA',
         'CE',
-        'CS',
+        'CA',
         'EQ',
         'COMA',
         'PNTO',
         'LEN',
         'AND',
         'OR',
-        'TAB',
         'DPNTO'
     ) + tuple(reserved.values())
-    t_ignore = ' '
+    t_ignore = ' \t'
 
     t_EQ = r'='
     t_SUM = r'\+'
@@ -70,7 +65,6 @@ class LexerClass:
     t_COMA = r','
     t_PNTO = r'\.'
     t_DPNTO = r':'
-    t_TAB = r'\t+'
 
     t_I = r'=='
     t_M = r'>'
@@ -81,52 +75,35 @@ class LexerClass:
     t_OR = r'\|\|'
 
     t_LLE = r'{'
-    t_LLS = r'}'
+    t_LLA = r'}'
     t_CE = r'\['
-    t_CS = r'\]'
+    t_CA = r'\]'
     t_PE = r'\('
-    t_PS = r'\)'
+    t_PA = r'\)'
 
     t_LEN = r'len'
 
 
-
-
     @staticmethod
-    def t_ENTERO_BINARIO(t):
-        r'0b[01]+'
-        t.value = int(t.value[2:], 2)
-        return t
-
-    @staticmethod
-    def t_ENTERO_OCTAL(t):
-        r'0o[0-7]+'
-        t.value = int(t.value[2:], 8)
-        return t
-
-    @staticmethod
-    def t_ENTERO_HEXADECIMAL(t):
-        r'0x[0-9A-F]+'
-        t.value = int(t.value[2:], 16)
-        return t
-
-    @staticmethod
-    def t_REAL_CIENTIFICO(t):
-        r'(\d+\.\d+|\d+)e[+-]?\d+'
+    def t_REAL(t):
+        r'\d+\.\d+([eE][+-]?\d+)?|\d+[eE][+-]?\d+'
         t.value = float(t.value)
         return t
 
     @staticmethod
-    def t_REAL_DECIMAL(t):
-        r'\d+\.\d+'
-        t.value = float(t.value)
+    def t_ENTERO(t):
+        r'0b[01]+|0o[0-7]+|0x[0-9A-F]+|\d+'
+        if t.value.startswith("0b"):
+            t.value = int(t.value[2:], 2)
+        elif t.value.startswith("0o"):
+            t.value = int(t.value[2:], 8)
+        elif t.value.startswith("0x"):
+            t.value = int(t.value[2:], 16)
+        else:
+            t.value = int(t.value)
         return t
 
-    @staticmethod
-    def t_ENTERO_DECIMAL(t):
-        r'\d+'
-        t.value = int(t.value)
-        return t
+
 
     @staticmethod
     def t_CARACTER(t):
@@ -177,9 +154,10 @@ class LexerClass:
 
     @staticmethod
     def t_ID(t):
-        r'[a-zA-Z_][a-zA-Z_0-9]*'
+        r'[a-zA-Z_\u0080-\u00FF][a-zA-Z_0-9\u0080-\u00FF]*'
         t.type = LexerClass.reserved.get(t.value, 'ID')
         return t
+
 
     def __init__(self):        
         self.lexerObj = lex.lex(module=self)
