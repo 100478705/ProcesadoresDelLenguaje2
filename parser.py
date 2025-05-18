@@ -3,6 +3,7 @@ import sys
 import ply.yacc as yacc
 import lexer
 import math
+from lexer import LexerClass
 
 class ParserClass:
     def __init__(self, filename):
@@ -32,6 +33,10 @@ class ParserClass:
         self.lexer = lexer.LexerClass()
         self.parser = yacc.yacc(module=self, debug=True)
 
+    def parse_linea(self, texto):
+        nuevo_lexer = LexerClass()
+        nuevo_lexer.lexerObj.input(texto + '\n')
+        self.parser.parse(lexer=nuevo_lexer.lexerObj)
 
     def p_programa(self, p):
         '''programa : linea programa
@@ -41,63 +46,65 @@ class ParserClass:
     def p_linea(self, p):
         '''linea : expresion NEWLINE
                 | NEWLINE'''
-        if len(p) == 3 and p[1] is not None and p[1] != '\n':
-            self.resultados.append((self.contador_lineas, str(p[1])))
-        self.contador_lineas += 1
+        if len(p) == 3 and p[1] is not None:
+            linea_real = p.lineno(2)
+            self.resultados.append((linea_real, str(p[1])))
 
     def p_declaracion_variable(self, p):
         '''expresion : tipo lista_declaraciones'''
-        tipo = p[1]
-        lista = p[2]
-        mensajes = []
-        
-        ultimo_valor = None
-        
-        for item in reversed(lista):
-            # Caso especial: vector detectado
-            if len(item) == 3 and item[1] == '__vector_init__':
-                nombre, _, size = item
-                mensajes.append(f"Vector '{nombre}' de tipo {tipo} inicializado con tamaño {size}")
-                continue
+        tipo_ast  = p[1]       # 'int'  o  ('vector', 'int', 3)
+        declaracs = p[2]       # [(nombre, valor|None), ...]
 
-            nombre, valor = item
+        mensajes = []
+
+        # Vector
+        if isinstance(tipo_ast, tuple) and tipo_ast[0] == 'vector':
+            base, size = tipo_ast[1], int(tipo_ast[2])
+
+            for nombre, _ in declaracs:          # no se admite asignación aquí
+                self.entorno[nombre] = {
+                    'type'  : 'vector',
+                    'base'  : base,              
+                    'size'  : size,
+                    'values': [0] * size         # inicializado a 0 / 0.0 / False / ''
+                }
+                mensajes.append(
+                    f"Vector '{nombre}' de tipo {base} inicializado con tamaño {size}"
+                )
+
+            p[0] = '\n'.join(mensajes)
+            return                                # ← terminamos
+
+
+        tipo = tipo_ast          # aquí es un str: 'int', 'float', …
+
+        ultimo_valor = None
+        for nombre, valor in reversed(declaracs):
 
             if valor is None and ultimo_valor is not None:
                 valor = ultimo_valor
             elif valor is not None:
                 ultimo_valor = valor
 
-            if valor is None:
-                mensajes.append(f"Variable '{nombre}' de tipo {tipo} declarada sin inicializar")
-                if tipo == 'int':
-                    valor_inicial = 0
-                elif tipo == 'float':
-                    valor_inicial = 0.0
-                elif tipo == 'bool':
-                    valor_inicial = False
-                else:  
-                    valor_inicial = ''
-
-                # Creo un entorno para las variables, 
-                # así se puedan inicializar sin valor
-
-                self.entorno[nombre] = {
-                    'type': tipo,
-                    'value': valor_inicial
-                }
-
-            else:
-                if tipo == 'char' and not (isinstance(valor, str) and len(valor) == 1):
-                    mensajes.append(f"Error: Variable '{nombre}' debe ser char")
-                elif tipo == 'int' and not isinstance(valor, int):
-                    mensajes.append(f"Error: Variable '{nombre}' debe ser int")
-                elif tipo == 'float' and not isinstance(valor, float):
-                    mensajes.append(f"Error: Variable '{nombre}' debe ser float")
-                elif tipo == 'bool' and not isinstance(valor, bool):
-                    mensajes.append(f"Error: Variable '{nombre}' debe ser bool")
+            if valor is None:                     # sin inicializar
+                defecto = 0 if tipo == 'int' else 0.0 if tipo == 'float' \
+                        else False if tipo == 'bool' else ''
+                self.entorno[nombre] = {'type': tipo, 'value': defecto}
+                mensajes.append(
+                    f"Variable '{nombre}' de tipo {tipo} declarada sin inicializar"
+                )
+            else:                                 # con inicialización
+                ok = ((tipo == 'char'  and isinstance(valor, str)  and len(valor) == 1) or
+                    (tipo == 'int'   and isinstance(valor, int)) or
+                    (tipo == 'float' and isinstance(valor, float)) or
+                    (tipo == 'bool'  and isinstance(valor, bool)))
+                if not ok:
+                    mensajes.append(f"Error: Variable '{nombre}' debe ser {tipo}")
                 else:
                     self.entorno[nombre] = valor
-                    mensajes.append(f"Variable '{nombre}' de tipo {tipo} inicializada con valor {valor}")
+                    mensajes.append(
+                        f"Variable '{nombre}' de tipo {tipo} inicializada con valor {valor}"
+                    )
 
         p[0] = '\n'.join(reversed(mensajes))
 
@@ -114,20 +121,16 @@ class ParserClass:
     def p_declaracion(self, p):
         '''declaracion : ID
                     | ID EQ expresion
-                    | ID CE ENTERO_DECIMAL CS'''
+                    | CE ENTERO CA ID'''
         if len(p) == 2:
             p[0] = (p[1], None)
         elif len(p) == 4:
             p[0] = (p[1], p[3])
         elif len(p) == 5:
-            vector_name = p[1]
-            size = int(p[3])
-            self.entorno[vector_name] = {
-                'type': 'vector',
-                'size': size,
-                'values': [0]*size
-            }
+            vector_name = p[4]
+            size = int(p[2])
             p[0] = (vector_name, '__vector_init__', size)
+
 
     def p_expresion_vector_len(self, p):    
         '''expresion : ID PNTO LEN'''
@@ -140,7 +143,7 @@ class ParserClass:
             p[0] = f"Error: '{nombre}' no es un vector"
 
     def p_elemento_acceso_vector(self, p):
-        '''elemento : ID CE ENTERO_DECIMAL CS'''
+        '''elemento : ID CE ENTERO CA'''
         nombre = p[1]
         indice = p[3]
 
@@ -157,7 +160,7 @@ class ParserClass:
             p[0] = self.entorno[nombre]['values'][indice]
 
     def p_asignacion_vector_elemento(self, p):
-        '''expresion : ID CE ENTERO_DECIMAL CS EQ expresion'''
+        '''expresion : ID CE ENTERO CA EQ expresion'''
         nombre = p[1]
         indice = p[3]
         valor = p[6]
@@ -207,11 +210,10 @@ class ParserClass:
                 p[0] = f"Variable '{nombre}' actualizada a {valor}"
 
 #region Registros
-    #region Declaración de Tipo de Registro
     def p_declaracion_tipo_registro(self, p):
-        '''expresion : TYPE ID DPNTO NEWLINE bloque_propiedades'''
+        '''expresion : TYPE ID DPNTO grupo_apertura bloque_propiedades grupo_cierre'''
         type_name = p[2]
-        propiedades = p[5]  # Diccionario: {nombre_propiedad: tipo}
+        propiedades = p[5]
         if not hasattr(self, 'tipos_registro'):
             self.tipos_registro = {}
         if type_name in self.tipos_registro:
@@ -219,24 +221,50 @@ class ParserClass:
             return
         self.tipos_registro[type_name] = propiedades
         p[0] = f"Tipo de registro '{type_name}' declarado con propiedades: {list(propiedades.keys())}"
+    
+    def p_grupo_apertura(self, p):
+        '''grupo_apertura : opt_newline LLE opt_newline'''
+        pass
+
+    def p_grupo_cierre(self, p):
+        '''grupo_cierre : opt_newline LLA opt_newline'''
+        pass
+
+    def p_opt_newline(self, p):
+        '''opt_newline : NEWLINE
+                    | '''
+        pass
 
     def p_bloque_propiedades(self, p):
         '''bloque_propiedades : propiedad
-                            | propiedad bloque_propiedades'''
+                            | propiedad NEWLINE
+                            | propiedad NEWLINE bloque_propiedades
+                            | propiedad bloque_propiedades
+                            | NEWLINE bloque_propiedades'''
+
+
         if len(p) == 2:
-            p[0] = p[1]
-        else:
-            p[1].update(p[2])
+            if isinstance(p[1], dict):  # propiedad
+                p[0] = p[1]
+            else:  # NEWLINE
+                p[0] = p[1]
+        
+        elif len(p) == 3:
+            if isinstance(p[1], dict):  # propiedad NEWLINE
+                p[0] = p[1]
+            else:  # NEWLINE bloque_propiedades
+                p[0] = p[2]
+
+        else:  # propiedad NEWLINE bloque_propiedades
+            p[1].update(p[3])
             p[0] = p[1]
 
+
+
     def p_propiedad(self, p):
-        '''propiedad : TAB tipo lista_ids NEWLINE'''
-        tipo_prop = p[2]
-        lista = p[3]  # Lista de identificadores
-        propiedades = {}
-        for ident in lista:
-            propiedades[ident] = tipo_prop
-        p[0] = propiedades
+        '''propiedad : tipo lista_ids'''
+        p[0] = {ident: p[1] for ident in p[2]}
+
 
     def p_lista_ids(self, p):
         '''lista_ids : ID
@@ -245,21 +273,24 @@ class ParserClass:
             p[0] = [p[1]]
         else:
             p[0] = [p[1]] + p[3]
-    #endregion
-    #region Declaración de Variable de Registro
-    # ------------------ Declaración de Variable de Registro ------------------
+
     def p_declaracion_registro(self, p):
-        '''expresion : ID ID'''
+        '''expresion : ids'''
+        p[0] = p[1]
+
+    def p_ids(self, p):
+        '''ids : ID ID'''
         record_type = p[1]
         var_name = p[2]
-        if not hasattr(self, 'tipos_registro'):
-            self.tipos_registro = {}
-        if record_type not in self.tipos_registro:
+
+        if not hasattr(self, 'tipos_registro') or record_type not in self.tipos_registro:
+            print(f"Error: El tipo de registro '{record_type}' no ha sido declarado")
             p[0] = f"Error: El tipo de registro '{record_type}' no ha sido declarado"
             return
+
         propiedades = self.tipos_registro[record_type]
-        # Inicializar las propiedades con sus valores por defecto
         instance = {}
+
         for prop, tip in propiedades.items():
             if tip == 'int':
                 instance[prop] = 0
@@ -270,7 +301,8 @@ class ParserClass:
             elif tip == 'char':
                 instance[prop] = '\u0000'
             else:
-                instance[prop] = None  # Para tipos complejos se inicializa en None
+                instance[prop] = None
+
         self.entorno[var_name] = {
             'type': 'registro',
             'tipo_registro': record_type,
@@ -278,8 +310,6 @@ class ParserClass:
         }
         p[0] = f"Registro '{var_name}' de tipo '{record_type}' declarado"
 
-    #endregion
-    #region Acceso a Propiedades de Registro
     def p_expresion_acceso_registro(self, p):
         '''expresion : ID PNTO ID'''
         var = p[1]
@@ -295,9 +325,14 @@ class ParserClass:
             p[0] = f"Error: La propiedad '{prop}' no existe en el registro '{var}'"
             return
         p[0] = registro['props'][prop]
-    #endregion
-    #region Asignación a Propiedades de Registro
-    # ------------------ Asignación a Propiedades de Registro ------------------
+
+    def p_expresion_propiedad(self, p):
+        '''expresion : tipo lista_ids'''
+        tipo_prop = p[1]
+        ids = p[2]
+        p[0] = {ident: tipo_prop for ident in ids}
+
+
     def p_asignacion_propiedad_registro(self, p):
         '''expresion : ID PNTO ID EQ expresion'''
         var = p[1]
@@ -316,32 +351,47 @@ class ParserClass:
         registro['props'][prop] = valor
         p[0] = f"Propiedad '{prop}' de registro '{var}' actualizada a {valor}"
 
-    #endregion
+
 
 #endregion
 
 
-
+#region IF-ELSE
 #-------------------------IF-ELSE-------------------------
+   
     def p_expresion_if_simple(self, p):
         '''expresion : IF expresion bloque'''
         if isinstance(p[2], bool) and p[2]:
+            # Ejecuta cada sentencia del bloque y captura resultados
+            resultados = []
             for sentencia in p[3]:
-                self.parser.parse(sentencia, lexer=self.lexer.lexerObj)
-            p[0] = "If ejecutado: True"
+                resultado = self.parser.parse(sentencia, lexer=self.lexer.lexerObj)
+                if resultado:
+                    resultados.append(resultado)
+                    self.resultados.append((p.lineno(1), resultado))  # Registra en resultados generales
+            
+            # Mensaje de salida
+            if resultados:
+                p[0] = f"If ejecutado (línea {p.lineno(1)}):\n  - " + "\n  - ".join(resultados)
+            else:
+                p[0] = f"If ejecutado (línea {p.lineno(1)}): Bloque vacío"
         else:
             p[0] = "If no ejecutado"
 
-
     def p_expresion_if_else(self, p):
         '''expresion : IF expresion bloque ELSE bloque'''
+        linea_if = p.lineno(1)  # Línea donde empieza el if
         if isinstance(p[2], bool) and p[2]:
             for sentencia in p[3]:
-                self.parser.parse(sentencia, lexer=self.lexer.lexerObj)
+                resultado = self.parser.parse(sentencia, lexer=self.lexer.lexerObj)
+                if resultado is not None:
+                    self.resultados.append((linea_if, resultado))
             p[0] = "If ejecutado: True"
         else:
             for sentencia in p[5]:
-                self.parser.parse(sentencia, lexer=self.lexer.lexerObj)
+                resultado = self.parser.parse(sentencia, lexer=self.lexer.lexerObj)
+                if resultado is not None:
+                    self.resultados.append((linea_if, resultado))
             p[0] = "Else ejecutado"
 
     def p_expresion_while(self, p):
@@ -353,25 +403,17 @@ class ParserClass:
 
 
     def p_bloque_llaves(self, p):
-        '''bloque : LLE expresiones LLA
-                | NEWLINE LLE expresiones LLA
-                | LLE NEWLINE expresiones LLA
-                | LLE expresiones NEWLINE LLA
-                | NEWLINE LLE NEWLINE expresiones LLA
-                | LLE NEWLINE expresiones NEWLINE LLA
-                | NEWLINE LLE expresiones NEWLINE LLA
-                | NEWLINE LLE NEWLINE expresiones NEWLINE LLA'''
-        # Siempre devolvemos las expresiones
-        for i in p:
-            if isinstance(i, list):
-                p[0] = i
-                break
+        '''bloque : grupo_apertura expresiones grupo_cierre''' 
+        p[0] = p[2]
 
 
     def p_expresiones(self, p):
-        '''expresiones : expresion NEWLINE
-                    | expresion NEWLINE expresiones'''
-        if len(p) == 3:
+        '''expresiones : expresion
+                | expresion NEWLINE
+                | expresion NEWLINE expresiones'''
+        if len(p) == 2:
+            p[0] = [p[1]]
+        elif len(p) == 3:
             p[0] = [p[1]]
         else:
             p[0] = [p[1]] + p[3]
@@ -380,14 +422,25 @@ class ParserClass:
 
 
 
+    def p_tipo_base(self, p):
+        '''tipo_base : INT
+                    | FLOAT
+                    | BOOL
+                    | CHAR'''
+        p[0] = p[1].lower() # No especifica el enunciado si tambien puede ser mayusculas
+
 
 
     def p_tipo(self, p):
-        '''tipo : INT
-               | FLOAT
-               | BOOL
-               | CHAR'''
-        p[0] = p[1].lower()
+        '''tipo : tipo_base
+                | tipo_base CE ENTERO CA'''
+        if len(p) == 2:
+            p[0] = p[1]  # e.g., 'int'
+        else:
+            base = p[1]
+            size = p[3]
+            p[0] = ('vector', base, size)
+
 
     def p_expresion(self, p):
         '''expresion : expresion OR expresion_logica
@@ -455,22 +508,18 @@ class ParserClass:
         p[0] = True if p[1].lower() == 'true' else False
 
     def p_elemento(self, p):
-        '''elemento : ENTERO_DECIMAL
-                    | ENTERO_BINARIO
-                    | ENTERO_OCTAL
-                    | ENTERO_HEXADECIMAL
-                    | REAL_DECIMAL
-                    | REAL_CIENTIFICO
+        '''elemento : ENTERO
+                    | REAL
                     | booleano
                     | CARACTER
                     | ID
-                    | PE expresion PS
+                    | PE expresion PA
                     | RES elemento %prec UMINUS
                     | NOT elemento
-                    | SEN PE expresion PS
-                    | COS PE expresion PS
-                    | EXP PE expresion PS
-                    | LOG PE expresion PS'''
+                    | SEN PE expresion PA
+                    | COS PE expresion PA
+                    | EXP PE expresion PA
+                    | LOG PE expresion PA'''
         
         if len(p) == 2:
             if isinstance(p[1], str) and p.slice[1].type == 'ID':
@@ -524,10 +573,7 @@ class ParserClass:
             # Cargar contenido al lexer
             self.lexer.lexerObj.input(contenido)
 
-            # DEBUG opcional: mostrar tokens
-            print("=== DEBUG: tokens ===")
-            for tok in self.lexer.lexerObj:
-                print(tok)
+           
 
             self.lexer.lexerObj.input(contenido)
 

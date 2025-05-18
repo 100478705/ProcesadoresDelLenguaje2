@@ -23,7 +23,8 @@ class LexerClass:
         'sin': 'SEN',
         'cos': 'COS',
         'log': 'LOG',
-        'exp': 'EXP'
+        'exp': 'EXP', 
+        'len': 'LEN'
     }
 
     tokens = (
@@ -50,7 +51,6 @@ class LexerClass:
         'EQ',
         'COMA',
         'PNTO',
-        'LEN',
         'AND',
         'OR',
         'DPNTO'
@@ -81,7 +81,6 @@ class LexerClass:
     t_PE = r'\('
     t_PA = r'\)'
 
-    t_LEN = r'len'
 
 
     @staticmethod

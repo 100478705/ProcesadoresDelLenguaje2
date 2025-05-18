@@ -1,8 +1,0 @@
-type Persona:
-	int edad, altura, inicial
-
-Persona p
-p.inicial = 'A'
-p.edad = 30
-p.altura = 175
-p.inicial

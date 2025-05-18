@@ -1,0 +1,49 @@
+# Declaración de variables básicas
+int x = 10
+float y
+char z = 'a'
+bool b = true
+
+# Declaración de vector
+int[3] vec
+vec[0] = 1
+vec[1] = 2
+vec[2] = 3
+vec.len
+
+# Declaración de tipo de registro
+type Persona: 
+{
+    int edad, altura
+    char inicial 
+}
+# Declaración de variable de tipo registro
+Persona p
+p.edad = 25
+p.altura = 180
+p.inicial = 'R'
+
+# Acceso a propiedad
+p.edad
+
+# Condicional con bloque
+if true {
+    x = x + 5
+}
+
+# If-else
+if true {
+    y = 3.14
+} else {
+    y = 6.28
+}
+
+# While con bloque
+int contador = 0
+while contador < 3 {
+    contador = contador + 1
+}
+
+# Operaciones válidas
+x = x + 1
+b = not false

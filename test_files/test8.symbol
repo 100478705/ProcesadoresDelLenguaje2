@@ -1,0 +1,6 @@
+int x
+float y
+str z
+bool b
+vector vec
+Persona p

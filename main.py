@@ -39,6 +39,28 @@ def analizar_parser(archivo):
     parser = ParserClass(archivo)
     try:
         parser.run()
+        base = os.path.splitext(archivo)[0]
+
+
+         # Tabla de símbolos
+        with open(base + '.symbol', 'w') as f_sym:
+            for nombre, info in parser.entorno.items():
+                if isinstance(info, dict):
+                    if info.get('type') == 'registro':
+                        tipo = info.get('tipo_registro', 'registro') 
+                    else:
+                        tipo = info['type']
+                else:
+                    tipo = type(info).__name__
+                f_sym.write(f"{tipo} {nombre}\n")
+
+
+        # Tabla de registros
+        if hasattr(parser, 'tipos_registro'):
+            with open(base + '.record', 'w') as f_rec:
+                for nombre, props in parser.tipos_registro.items():
+                    campos = ','.join(props.keys())
+                    f_rec.write(f"{nombre} {campos}\n")
     except Exception as e:
         print(f"Error al ejecutar el parser: {e}")
         traceback.print_exc()
