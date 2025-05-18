@@ -1,12 +1,8 @@
-#combinaciones de operaciones
-- * 5 3 / 80 10
-* / 10 5 2
-* neg 3 4
-/ * 5 - 4 3 - 8 - 4 1
-+ sin exp 2 3
-+ + 3 4 5
-+ 2 / 4 2
-sin neg 0xABC
+int a, h, c = 30
+int b, v = 10
 
-
-+ 1 1
+type Persona:
+{
+    int edad
+}
+Persona p

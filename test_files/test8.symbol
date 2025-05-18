@@ -1,6 +1,7 @@
-int x
-float y
-str z
+int a
+int fa
+int y
+char z
 bool b
 vector vec
-Persona p
+int vector_lenght

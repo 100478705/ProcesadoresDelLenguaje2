@@ -8,6 +8,7 @@ from lexer import LexerClass
 class ParserClass:
     def __init__(self, filename):
         self.entorno = {}
+        self.tipos_registro = {}
         self.Comentadas = []
         self.resultados = []
         self.contador_lineas = 1
@@ -45,77 +46,20 @@ class ParserClass:
 
     def p_linea(self, p):
         '''linea : expresion NEWLINE
+                | expresion
                 | NEWLINE'''
-        if len(p) == 3 and p[1] is not None:
-            linea_real = p.lineno(2)
+        
+        if p[1] is not None:
+            lineno_token = 2 if len(p) == 3 else 1
+            linea_real = p.lineno(lineno_token)
             self.resultados.append((linea_real, str(p[1])))
 
-    def p_declaracion_variable(self, p):
-        '''expresion : tipo lista_declaraciones'''
-        tipo_ast  = p[1]       # 'int'  o  ('vector', 'int', 3)
-        declaracs = p[2]       # [(nombre, valor|None), ...]
 
-        mensajes = []
-
-        # Vector
-        if isinstance(tipo_ast, tuple) and tipo_ast[0] == 'vector':
-            base, size = tipo_ast[1], int(tipo_ast[2])
-
-            for nombre, _ in declaracs:          # no se admite asignación aquí
-                self.entorno[nombre] = {
-                    'type'  : 'vector',
-                    'base'  : base,              
-                    'size'  : size,
-                    'values': [0] * size         # inicializado a 0 / 0.0 / False / ''
-                }
-                mensajes.append(
-                    f"Vector '{nombre}' de tipo {base} inicializado con tamaño {size}"
-                )
-
-            p[0] = '\n'.join(mensajes)
-            return                                # ← terminamos
-
-
-        tipo = tipo_ast          # aquí es un str: 'int', 'float', …
-
-        ultimo_valor = None
-        for nombre, valor in reversed(declaracs):
-
-            if valor is None and ultimo_valor is not None:
-                valor = ultimo_valor
-            elif valor is not None:
-                ultimo_valor = valor
-
-            if valor is None:                     # sin inicializar
-                defecto = 0 if tipo == 'int' else 0.0 if tipo == 'float' \
-                        else False if tipo == 'bool' else ''
-                self.entorno[nombre] = {'type': tipo, 'value': defecto}
-                mensajes.append(
-                    f"Variable '{nombre}' de tipo {tipo} declarada sin inicializar"
-                )
-            else:                                 # con inicialización
-                ok = ((tipo == 'char'  and isinstance(valor, str)  and len(valor) == 1) or
-                    (tipo == 'int'   and isinstance(valor, int)) or
-                    (tipo == 'float' and isinstance(valor, float)) or
-                    (tipo == 'bool'  and isinstance(valor, bool)))
-                if not ok:
-                    mensajes.append(f"Error: Variable '{nombre}' debe ser {tipo}")
-                else:
-                    self.entorno[nombre] = valor
-                    mensajes.append(
-                        f"Variable '{nombre}' de tipo {tipo} inicializada con valor {valor}"
-                    )
-
-        p[0] = '\n'.join(reversed(mensajes))
-
-
+    
     def p_lista_declaraciones(self, p):
         '''lista_declaraciones : declaracion
-                            | declaracion COMA lista_declaraciones'''
-        if len(p) == 2:
-            p[0] = [p[1]]
-        else:
-            p[0] = [p[1]] + p[3]
+                            | lista_declaraciones COMA declaracion'''
+        p[0] = p[1] + [p[3]] if len(p) == 4 else [p[1]]
 
 
     def p_declaracion(self, p):
@@ -165,16 +109,117 @@ class ParserClass:
         indice = p[3]
         valor = p[6]
 
+        # Verificar que el vector está declarado
         if nombre not in self.entorno:
             p[0] = f"Error: Vector '{nombre}' no declarado"
-        elif not isinstance(self.entorno[nombre], dict) or self.entorno[nombre].get('type') != 'vector':
-            p[0] = f"Error: '{nombre}' no es un vector"
-        elif not (0 <= indice < self.entorno[nombre]['size']):
-            p[0] = f"Error: Índice fuera de rango para el vector '{nombre}'"
-        else:
-            self.entorno[nombre]['values'][indice] = valor
-            p[0] = f"Elemento {indice} de vector '{nombre}' actualizado a {valor}"
+            return
 
+        vector = self.entorno[nombre]
+        if not isinstance(vector, dict) or vector.get('type') != 'vector':
+            p[0] = f"Error: '{nombre}' no es un vector"
+            return
+
+        # Verificar índice válido
+        if not isinstance(indice, int) or not (0 <= indice < vector['size']):
+            p[0] = f"Error: Índice fuera de rango para el vector '{nombre}'"
+            return
+
+        # Verificar tipo del valor
+        if not isinstance(valor, dict) or 'tipo' not in valor:
+            p[0] = f"Error: Valor asignado a '{nombre}[{indice}]' no tiene tipo válido"
+            return
+
+        tipo_valor = valor['tipo']
+        tipo_esperado = vector['base']
+
+        # Permitir int → float si es necesario
+        compatibles = (tipo_esperado == tipo_valor) or \
+                    (tipo_esperado == 'float' and tipo_valor == 'int')
+
+        if not compatibles:
+            p[0] = f"Error: No se puede asignar tipo '{tipo_valor}' al vector '{nombre}' de tipo '{tipo_esperado}'"
+        else:
+            vector['values'][indice] = f"<{tipo_valor}>"  # asignación simbólica
+            p[0] = f"Elemento {indice} de vector '{nombre}' actualizado (tipo {tipo_valor})"
+
+    def p_declaracion_variable(self, p):
+        '''expresion : tipo lista_declaraciones'''
+        tipo_ast, declaracs = p[1], p[2]
+        mensajes = []
+
+        # — Vectores —
+        if isinstance(tipo_ast, tuple) and tipo_ast[0] == 'vector':
+            base, size = tipo_ast[1], int(tipo_ast[2])
+
+            for nombre, _ in declaracs:
+                # Si es un tipo de registro definido
+                if base in self.tipos_registro:
+                    props = self.tipos_registro[base]
+                    default_instance = {
+                        prop: (0 if tipo == 'int' else
+                            0.0 if tipo == 'float' else
+                            False if tipo == 'bool' else
+                            '\u0000')
+                        for prop, tipo in props.items()
+                    }
+                    self.entorno[nombre] = {
+                        'type': 'vector',
+                        'base': base,
+                        'size': size,
+                        'values': [default_instance.copy() for _ in range(size)]
+                    }
+                    mensajes.append(f"Vector '{nombre}' de tipo registro '{base}' con tamaño {size}")
+                else:
+                    # Vector de tipo primitivo
+                    self.entorno[nombre] = {
+                        'type': 'vector',
+                        'base': base,
+                        'size': size,
+                        'values': [0] * size
+                    }
+                    mensajes.append(f"Vector '{nombre}' de tipo {base} inicializado con tamaño {size}")
+
+            p[0] = '\n'.join(mensajes)
+            return
+
+        # — Escalares con propagación de valor en cadena —
+        tipo = tipo_ast
+        ultimo_valor = None
+
+        for nombre, valor in reversed(declaracs):
+            # Si encontramos un literal puro, convertimos a dict{'tipo':...}
+            if isinstance(valor, int):
+                valor = {'tipo': 'int'}
+            elif isinstance(valor, float):
+                valor = {'tipo': 'float'}
+            elif isinstance(valor, bool):
+                valor = {'tipo': 'bool'}
+            elif isinstance(valor, str) and len(valor) == 1:
+                valor = {'tipo': 'char'}
+
+            if valor is None and ultimo_valor is not None:
+                valor = ultimo_valor
+            elif valor is not None:
+                ultimo_valor = valor
+
+            if valor is None:
+                defecto = (0 if tipo == 'int'
+                        else 0.0 if tipo == 'float'
+                        else False if tipo == 'bool'
+                        else '\u0000')
+                self.entorno[nombre] = {'type': tipo, 'value': defecto}
+                mensajes.append(f"Variable '{nombre}' de tipo {tipo} declarada sin inicializar")
+                continue
+
+            tipo_valor = valor['tipo']
+            compatibles = (tipo == tipo_valor) or (tipo == 'float' and tipo_valor == 'int')
+            if compatibles:
+                self.entorno[nombre] = {'type': tipo, 'value': f'<{tipo_valor}>'}
+                mensajes.append(f"Variable '{nombre}' de tipo {tipo} inicializada con valor {tipo_valor}")
+            else:
+                mensajes.append(f"Error: Variable '{nombre}' debe ser {tipo}")
+
+        p[0] = '\n'.join(reversed(mensajes))
 
     def p_asignacion_variable(self, p):
         '''expresion : ID EQ expresion'''
@@ -184,30 +229,32 @@ class ParserClass:
         if nombre not in self.entorno:
             print(f"Error: Variable '{nombre}' no declarada")
             p[0] = f"Error: Variable '{nombre}' no declarada"
-        else:
-            # Verificar tipo antes de asignar
-            var_type = None
-            if isinstance(self.entorno[nombre], bool):
-                var_type = 'bool'
-            elif isinstance(self.entorno[nombre], int):
-                var_type = 'int'
-            elif isinstance(self.entorno[nombre], float):
-                var_type = 'float'
-            elif isinstance(self.entorno[nombre], str):
-                var_type = 'char' if len(self.entorno[nombre]) == 1 else 'str'
+            return
 
-            if var_type == 'char' and not (isinstance(valor, str) and len(valor) == 1):
-                print(f"Error: Variable '{nombre}' debe ser char")
-                p[0] = f"Error: Variable '{nombre}' debe ser char"
-            elif var_type == 'int' and not isinstance(valor, int):
-                print(f"Error: Variable '{nombre}' debe ser int")
-                p[0] = f"Error: Variable '{nombre}' debe ser int"
-            elif var_type == 'bool' and not isinstance(valor, bool):
-                print(f"Error: Variable '{nombre}' debe ser bool")
-                p[0] = f"Error: Variable '{nombre}' debe ser bool"
-            else:
-                self.entorno[nombre] = valor
-                p[0] = f"Variable '{nombre}' actualizada a {valor}"
+        if not isinstance(valor, dict) or 'tipo' not in valor:
+            print(f"Error: Valor asignado a '{nombre}' no tiene tipo válido")
+            p[0] = f"Error: Asignación inválida"
+            return
+
+        tipo_valor = valor['tipo']
+
+        # Obtenemos tipo esperado
+        var_info = self.entorno[nombre]
+        if isinstance(var_info, dict) and 'type' in var_info:
+            tipo_esperado = var_info['type']
+        else:
+            tipo_esperado = type(var_info).__name__
+
+        # Comprobamos compatibilidad de tipos
+        compatibles = (tipo_esperado == tipo_valor) or \
+                    (tipo_esperado == 'float' and tipo_valor == 'int')  # int -> float permitido
+
+        if not compatibles:
+            print(f"Error: No se puede asignar tipo '{tipo_valor}' a variable '{nombre}' de tipo '{tipo_esperado}'")
+            p[0] = f"Error: Tipos incompatibles en asignación a '{nombre}'"
+        else:
+            self.entorno[nombre] = {'type': tipo_esperado, 'value': f"<{tipo_valor}>"}  # opcional
+            p[0] = f"Variable '{nombre}' actualizada (tipo {tipo_valor})"
 
 #region Registros
     def p_declaracion_tipo_registro(self, p):
@@ -268,17 +315,17 @@ class ParserClass:
 
     def p_lista_ids(self, p):
         '''lista_ids : ID
-                    | ID COMA lista_ids'''
+                    | lista_ids COMA ID'''
         if len(p) == 2:
             p[0] = [p[1]]
         else:
-            p[0] = [p[1]] + p[3]
+            p[0] = [p[3]] + p[1]
 
     def p_declaracion_registro(self, p):
         '''expresion : ids'''
         p[0] = p[1]
 
-    def p_ids(self, p):
+    def p_ids_registro(self, p):
         '''ids : ID ID'''
         record_type = p[1]
         var_name = p[2]
@@ -326,11 +373,6 @@ class ParserClass:
             return
         p[0] = registro['props'][prop]
 
-    def p_expresion_propiedad(self, p):
-        '''expresion : tipo lista_ids'''
-        tipo_prop = p[1]
-        ids = p[2]
-        p[0] = {ident: tipo_prop for ident in ids}
 
 
     def p_asignacion_propiedad_registro(self, p):
@@ -338,6 +380,8 @@ class ParserClass:
         var = p[1]
         prop = p[3]
         valor = p[5]
+
+        # Verificar existencia del registro
         if var not in self.entorno:
             p[0] = f"Error: Variable '{var}' no declarada"
             return
@@ -345,12 +389,55 @@ class ParserClass:
         if not (isinstance(registro, dict) and registro.get('type') == 'registro'):
             p[0] = f"Error: '{var}' no es un registro"
             return
+
+        # Verificar que la propiedad existe
         if prop not in registro.get('props', {}):
             p[0] = f"Error: La propiedad '{prop}' no existe en el registro '{var}'"
             return
-        registro['props'][prop] = valor
-        p[0] = f"Propiedad '{prop}' de registro '{var}' actualizada a {valor}"
 
+        # Verificar tipo del valor
+        if not isinstance(valor, dict) or 'tipo' not in valor:
+            p[0] = f"Error: Valor asignado a '{var}.{prop}' no tiene tipo válido"
+            return
+
+        tipo_esperado = self.tipos_registro[registro['tipo_registro']][prop]
+        tipo_valor = valor['tipo']
+
+        # Permitir int -> float si es necesario
+        compatibles = (tipo_esperado == tipo_valor) or \
+                    (tipo_esperado == 'float' and tipo_valor == 'int')
+
+        if not compatibles:
+            p[0] = f"Error: No se puede asignar tipo '{tipo_valor}' a propiedad '{prop}' de tipo '{tipo_esperado}'"
+        else:
+            registro['props'][prop] = f"<{tipo_valor}>"  # asignación simbólica
+            p[0] = f"Propiedad '{prop}' de registro '{var}' actualizada (tipo {tipo_valor})"
+
+    def p_expresion_acceso_vector_registro(self, p):
+        '''expresion : ID CE ENTERO CA PNTO ID'''
+        nombre_vector = p[1]
+        indice = p[3]
+        propiedad = p[6]
+
+        if nombre_vector not in self.entorno:
+            p[0] = f"Error: Vector '{nombre_vector}' no declarado"
+            return
+
+        vector = self.entorno[nombre_vector]
+        if vector.get('type') != 'vector':
+            p[0] = f"Error: '{nombre_vector}' no es un vector"
+            return
+
+        if not (0 <= indice < vector['size']):
+            p[0] = f"Error: Índice fuera de rango para el vector '{nombre_vector}'"
+            return
+
+        elemento = vector['values'][indice]
+        if not isinstance(elemento, dict) or propiedad not in elemento:
+            p[0] = f"Error: Propiedad '{propiedad}' no encontrada en elemento del vector"
+            return
+
+        p[0] = {'tipo': self.tipos_registro[vector['base']][propiedad]}
 
 
 #endregion
@@ -361,45 +448,24 @@ class ParserClass:
    
     def p_expresion_if_simple(self, p):
         '''expresion : IF expresion bloque'''
-        if isinstance(p[2], bool) and p[2]:
-            # Ejecuta cada sentencia del bloque y captura resultados
-            resultados = []
-            for sentencia in p[3]:
-                resultado = self.parser.parse(sentencia, lexer=self.lexer.lexerObj)
-                if resultado:
-                    resultados.append(resultado)
-                    self.resultados.append((p.lineno(1), resultado))  # Registra en resultados generales
-            
-            # Mensaje de salida
-            if resultados:
-                p[0] = f"If ejecutado (línea {p.lineno(1)}):\n  - " + "\n  - ".join(resultados)
-            else:
-                p[0] = f"If ejecutado (línea {p.lineno(1)}): Bloque vacío"
+        if p[2].get('tipo') != 'bool':
+            p[0] = f"Error: La condición del 'if' debe ser booleana, no '{p[2].get('tipo')}'"
         else:
-            p[0] = "If no ejecutado"
+            p[0] = {'tipo': 'control'}  
 
     def p_expresion_if_else(self, p):
         '''expresion : IF expresion bloque ELSE bloque'''
-        linea_if = p.lineno(1)  # Línea donde empieza el if
-        if isinstance(p[2], bool) and p[2]:
-            for sentencia in p[3]:
-                resultado = self.parser.parse(sentencia, lexer=self.lexer.lexerObj)
-                if resultado is not None:
-                    self.resultados.append((linea_if, resultado))
-            p[0] = "If ejecutado: True"
+        if p[2].get('tipo') != 'bool':
+            p[0] = f"Error: La condición del 'if' debe ser booleana, no '{p[2].get('tipo')}'"
         else:
-            for sentencia in p[5]:
-                resultado = self.parser.parse(sentencia, lexer=self.lexer.lexerObj)
-                if resultado is not None:
-                    self.resultados.append((linea_if, resultado))
-            p[0] = "Else ejecutado"
+            p[0] = {'tipo': 'control'}
 
     def p_expresion_while(self, p):
         '''expresion : WHILE expresion bloque'''
-        while isinstance(p[2], bool) and p[2]:
-            for sentencia in p[3]:
-                self.parser.parse(sentencia, lexer=self.lexer.lexerObj)
-        p[0] = "Bucle while finalizado"
+        if p[2].get('tipo') != 'bool':
+            p[0] = f"Error: La condición del 'while' debe ser booleana, no '{p[2].get('tipo')}'"
+        else:
+            p[0] = {'tipo': 'control'}
 
 
     def p_bloque_llaves(self, p):
@@ -433,79 +499,104 @@ class ParserClass:
 
     def p_tipo(self, p):
         '''tipo : tipo_base
-                | tipo_base CE ENTERO CA'''
+                | tipo_base CE ENTERO CA
+                | ID
+                | ID CE ENTERO CA'''
         if len(p) == 2:
-            p[0] = p[1]  # e.g., 'int'
+            p[0] = p[1]  # 'int', 'float', 'persona', etc.
         else:
             base = p[1]
             size = p[3]
             p[0] = ('vector', base, size)
 
 
+
     def p_expresion(self, p):
         '''expresion : expresion OR expresion_logica
                     | expresion_logica'''
         if len(p) == 4:
-            p[0] = p[1] or p[3]
+            if p[1].get('tipo') != 'bool' or p[3].get('tipo') != 'bool':
+                print("Error: operador OR requiere operandos booleanos")
+                p[0] = {'tipo': 'error'}
+            else:
+                p[0] = {'tipo': 'bool'}
         else:
             p[0] = p[1]
+
 
     def p_expresion_logica(self, p):
         '''expresion_logica : expresion_logica AND expresion_relacional
-                           | expresion_relacional'''
+                        | expresion_relacional'''
         if len(p) == 4:
-            p[0] = p[1] and p[3]
+            if p[1].get('tipo') != 'bool' or p[3].get('tipo') != 'bool':
+                print("Error: operador AND requiere operandos booleanos")
+                p[0] = {'tipo': 'error'}
+            else:
+                p[0] = {'tipo': 'bool'}
         else:
             p[0] = p[1]
+
 
     def p_expresion_relacional(self, p):
         '''expresion_relacional : termino_aritmetico I termino_aritmetico
-                               | termino_aritmetico M termino_aritmetico
-                               | termino_aritmetico m termino_aritmetico
-                               | termino_aritmetico MI termino_aritmetico
-                               | termino_aritmetico mI termino_aritmetico
-                               | termino_aritmetico'''
+                            | termino_aritmetico M termino_aritmetico
+                            | termino_aritmetico m termino_aritmetico
+                            | termino_aritmetico MI termino_aritmetico
+                            | termino_aritmetico mI termino_aritmetico
+                            | termino_aritmetico'''
         if len(p) == 4:
-            if p[2] == '==': p[0] = p[1] == p[3]
-            elif p[2] == '>': p[0] = p[1] > p[3]
-            elif p[2] == '<': p[0] = p[1] < p[3]
-            elif p[2] == '>=': p[0] = p[1] >= p[3]
-            elif p[2] == '<=': p[0] = p[1] <= p[3]
+            t1 = p[1].get('tipo')
+            t2 = p[3].get('tipo')
+            if t1 not in {'int', 'float'} or t2 not in {'int', 'float'}:
+                print(f"Error: Comparación inválida entre '{t1}' y '{t2}'")
+                p[0] = {'tipo': 'error'}
+            else:
+                p[0] = {'tipo': 'bool'}
         else:
             p[0] = p[1]
+
 
     def p_termino_aritmetico(self, p):
         '''termino_aritmetico : termino_aritmetico SUM factor
-                             | termino_aritmetico RES factor
-                             | factor'''
+                            | termino_aritmetico RES factor
+                            | factor'''
         if len(p) == 4:
-            if p[2] == '+': 
-                p[0] = p[1] + p[3]
-            elif p[2] == '-': 
-                p[0] = p[1] - p[3]
+            t1 = p[1].get('tipo')
+            t2 = p[3].get('tipo')
+
+            if t1 not in {'int', 'float'} or t2 not in {'int', 'float'}:
+                print(f"Error: Operación aritmética inválida entre '{t1}' y '{t2}'")
+                p[0] = {'tipo': 'error'}
+            elif 'float' in (t1, t2):
+                p[0] = {'tipo': 'float'}
+            else:
+                p[0] = {'tipo': 'int'}
         else:
             p[0] = p[1]
 
+
     def p_factor(self, p):
         '''factor : factor MUL elemento
-                 | factor DIV elemento
-                 | elemento'''
+                | factor DIV elemento
+                | elemento'''
         if len(p) == 4:
-            if p[2] == '*': 
-                p[0] = p[1] * p[3]
-            elif p[2] == '/':
-                if p[3] == 0:
-                    print("Error: División por cero")
-                    p[0] = None
-                else:
-                    p[0] = p[1] / p[3]
+            t1 = p[1].get('tipo')
+            t2 = p[3].get('tipo')
+            if t1 not in {'int', 'float'} or t2 not in {'int', 'float'}:
+                print(f"Error: Multiplicación o división inválida entre '{t1}' y '{t2}'")
+                p[0] = {'tipo': 'error'}
+            elif 'float' in (t1, t2):
+                p[0] = {'tipo': 'float'}
+            else:
+                p[0] = {'tipo': 'int'}
         else:
             p[0] = p[1]
+
 
     def p_booleano(self, p):
         '''booleano : TRUE
                     | FALSE'''
-        p[0] = True if p[1].lower() == 'true' else False
+        p[0] = {'tipo': 'bool'}
 
     def p_elemento(self, p):
         '''elemento : ENTERO
@@ -522,42 +613,46 @@ class ParserClass:
                     | LOG PE expresion PA'''
         
         if len(p) == 2:
-            if isinstance(p[1], str) and p.slice[1].type == 'ID':
-                if p[1] in self.entorno:
-                    valor = self.entorno[p[1]]
-                    if isinstance(valor, dict) and 'value' in valor:
-                        p[0] = valor['value']  # ✅ Devuelve solo el valor real
-                    else:
-                        p[0] = valor
+            token = p.slice[1].type
+            if token == 'ENTERO':
+                p[0] = {'tipo': 'int'}
+            elif token == 'REAL':
+                p[0] = {'tipo': 'float'}
+            elif token == 'CARACTER':
+                p[0] = {'tipo': 'char'}
+            elif token == 'ID':
+                nombre = p[1]
+                if nombre not in self.entorno:
+                    print(f"Error: Variable '{nombre}' no declarada")
+                    p[0] = {'tipo': 'error'}
                 else:
-                    print(f"Error: Variable '{p[1]}' no definida")
-                    p[0] = None
-            else:
+                    tipo = self.entorno[nombre]['type'] if isinstance(self.entorno[nombre], dict) else type(self.entorno[nombre]).__name__
+                    p[0] = {'tipo': tipo}
+            else:  # booleano ya devuelve correctamente
                 p[0] = p[1]
-        
+
         elif len(p) == 3:
             if p[1] == '-':
-                p[0] = -p[2]
+                p[0] = p[2]  # se mantiene tipo
             elif p[1] == 'not':
-                p[0] = not p[2]
-        
+                if p[2].get('tipo') != 'bool':
+                    print("Error: NOT requiere tipo booleano")
+                    p[0] = {'tipo': 'error'}
+                else:
+                    p[0] = {'tipo': 'bool'}
+
         elif len(p) == 4 and p[1] == '(':
             p[0] = p[2]
-        
+
         elif len(p) == 5:
-            val = p[3]
-            if p[1] == 'sin':
-                p[0] = math.sin(val)
-            elif p[1] == 'cos':
-                p[0] = math.cos(val)
-            elif p[1] == 'log':
-                if val <= 0:
-                    print("Error: Logaritmo de número no positivo")
-                    p[0] = None
-                else:
-                    p[0] = math.log(val)
-            elif p[1] == 'exp':
-                p[0] = math.exp(val)
+            funcion = p[1]
+            tipo_arg = p[3].get('tipo')
+            if tipo_arg != 'float' and tipo_arg != 'int':
+                print(f"Error: función {funcion} requiere tipo numérico, se recibió '{tipo_arg}'")
+                p[0] = {'tipo': 'error'}
+            else:
+                p[0] = {'tipo': 'float'}
+
 
     def p_error(self, p):
         if p:
@@ -581,13 +676,20 @@ class ParserClass:
                 # Ejecutar el parser
                 result = self.parser.parse(lexer=self.lexer.lexerObj)
 
-                # Mostrar resultados de cada línea analizada
+
                 if self.resultados:
-                    print("\n=== Resultados ===")
+                    print("\n=== Errores ===")
+                    E = 0
                     for linea, valor in self.resultados:
-                        print(f"Línea {linea}: {valor}")
+                        if isinstance(valor, str) and "error" in valor.lower():
+                            E = 1
+                            print(f"Línea {linea}: {valor}")
+                    if E == 0:
+                        print("No se encontraron errores.")
+
                 else:
-                    print("No se encontraron expresiones válidas.")
+                    print("No se encontraron errores.")
+
 
                 return result
 
