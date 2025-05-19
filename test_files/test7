@@ -1,8 +1,2 @@
-int a, h, c = 30
-int b, v = 10
+int f = 0.1
 
-type Persona:
-{
-    int edad
-}
-Persona p

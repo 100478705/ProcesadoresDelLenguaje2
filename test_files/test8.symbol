@@ -1,7 +1,9 @@
-int a
-int fa
-int y
-char z
-bool b
-vector vec
-int vector_lenght
+fa : int
+a : int
+y : int
+z : char
+b : bool
+alfa : float
+vec : vector
+vector_lenght : int
+per : vector
