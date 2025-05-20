@@ -229,13 +229,24 @@ class ParserClass:
                 }
             else:
                 # 3) Sin inicializador: declaramos sin inicializar
-                self.entorno[nombre] = {
-                    'type':        tipo_ast,
-                    'value':       None,
-                    'initialized': False
-                }
+                if isinstance(tipo_ast, tuple) and tipo_ast[0] == 'vector':
+                    _, base, size = tipo_ast
+                    self.entorno[nombre] = {
+                        'type':        'vector',
+                        'base':        base,
+                        'size':        size,
+                        'values':      [None] * size,
+                        'initialized': False
+                    }
+                else:
+                    self.entorno[nombre] = {
+                        'type':        tipo_ast,
+                        'value':       None,
+                        'initialized': False
+                    }
 
-        p[0] = None
+
+    
 
     def p_lista_declaraciones(self, p):
         """lista_declaraciones : lista_identificadores
@@ -255,62 +266,115 @@ class ParserClass:
     #
 
     def p_asignacion(self, p):
-        """asignacion : ID EQ expresion
-                    | ID EQ asignacion
-                    | elem_registro EQ expresion
-                    | elem_registro EQ asignacion"""
-        lhs = p[1]
-        rhs = p[3]
+        """asignacion : ID CE expresion CA EQ expresion
+        | ID CE expresion CA EQ asignacion
+        | ID EQ expresion
+        | ID EQ asignacion
+        | elem_registro EQ expresion
+        | elem_registro EQ asignacion"""
 
-        # — 1) Determinar destino (var o campo) —
-        if isinstance(lhs, tuple) and lhs[0] == 'field':
-            _, var_name, field = lhs
+        # — 1) Detectar el caso índice (vector) —
+        if p.slice[2].type == 'CE':
+            # gramática: ID CE expresion CA EQ (expresion|asignacion)
+            var_name  = p[1]
+            idx_expr  = p[3]
+            rhs       = p[6]
+            destino_kind = 'index'
+
+            # a) Verificar existencia y tipo vector
             if var_name not in self.entorno:
-                p[0] = f"Error: Variable '{var_name}' no declarada"
+                p[0] = {'error': f"Variable '{var_name}' no declarada", 'line': p.lineno(1)}
                 return
             entry = self.entorno[var_name]
-            tipo_dest = entry['type']
-            destino_kind = 'field'
+            if entry.get('type') != 'vector':
+                p[0] = {'error': f"'{var_name}' no es un vector", 'line': p.lineno(1)}
+                return
+
+            # b) Índice debe ser entero literal dentro de rango
+            if not isinstance(idx_expr, dict) or idx_expr.get('tipo') != 'int':
+                p[0] = {'error': f"Índice de '{var_name}' debe ser entero", 'line': p.lineno(3)}
+                return
+            idx_val = idx_expr['valor']
+            if not isinstance(idx_val, int):
+                p[0] = {'error': f"Índice de '{var_name}' debe ser un entero literal", 'line': p.lineno(3)}
+                return
+            size = entry['size']
+            if idx_val < 0 or idx_val >= size:
+                p[0] = {'error': f"Índice {idx_val} fuera de rango para '{var_name}' (tamaño {size})",
+                        'line': p.lineno(3)}
+                return
+
+            # c) Tipo destino es la base del vector
+            tipo_dest = entry['base']
+
         else:
-            var_name = lhs
+            # — resto de casos: variable simple o campo de registro —
+            lhs = p[1]
+            rhs = p[3]
+            if isinstance(lhs, tuple) and lhs[0] == 'field':
+                # elem_registro devolvió ('field', var_name, field)
+                _, var_name, field = lhs
+                destino_kind = 'field'
+            else:
+                var_name     = lhs
+                field        = None
+                destino_kind = 'var'
+
+            # Verificar existencia de la variable/registro
             if var_name not in self.entorno:
-                p[0] = f"Error: Variable '{var_name}' no declarada"
+                p[0] = {'error': f"Variable '{var_name}' no declarada", 'line': p.lineno(1)}
                 return
             entry = self.entorno[var_name]
-            tipo_dest = entry['type']
-            destino_kind = 'var'
 
-        # — 2) RHS debe ser dict con 'tipo' —
+            # Determinar tipo destino según el kind
+            if destino_kind == 'field':
+                # entry['type'] almacena el nombre del struct
+                struct_tipo = entry['type']
+                campos = self.tipos_registro.get(struct_tipo, {})
+                # campo ya validado en p_elem_registro
+                tipo_dest = campos[field]
+            else:
+                tipo_dest = entry['type']
+
+        # — 2) Propagar error de RHS si viene así —
+        if isinstance(rhs, dict) and 'error' in rhs:
+            p[0] = rhs
+            return
         if not isinstance(rhs, dict) or 'tipo' not in rhs:
-            p[0] = "Error interno: RHS no tiene tipo válido"
+            err_line = p.lineno(6) if destino_kind == 'index' else p.lineno(3)
+            p[0] = {'error': "RHS no tiene tipo válido", 'line': err_line}
             return
         tipo_orig = rhs['tipo']
         valor     = rhs.get('valor', None)
 
-        # — 3) Compatibilidad estricta —
+        # — 3) Compatibilidad estricta de tipos —
         numeric_rank = {'char':1, 'int':2, 'float':3}
         if tipo_dest in numeric_rank:
             if tipo_orig not in numeric_rank or numeric_rank[tipo_orig] > numeric_rank[tipo_dest]:
-                p[0] = f"Error: no se puede asignar {tipo_orig} a {tipo_dest}"
+                p[0] = {'error': f"No se puede asignar {tipo_orig} a {tipo_dest}", 'line': p.lineno(2)}
                 return
         elif tipo_dest == 'bool':
             if tipo_orig != 'bool':
-                p[0] = f"Error: no se puede asignar {tipo_orig} a {tipo_dest}"
+                p[0] = {'error': f"No se puede asignar {tipo_orig} a bool", 'line': p.lineno(2)}
                 return
 
-        # — 4) Hacer la asignación y marcar init —
+        # — 4) Realizar la asignación —
         if destino_kind == 'var':
-            entry['value'] = valor
+            entry['value']       = valor
             entry['initialized'] = True
-        else:
+        elif destino_kind == 'field':
             if entry.get('value') is None:
                 entry['value'] = {}
             entry['value'][field] = valor
-            # asumimos que el registro entero cuenta como inicializado
-            entry['initialized'] = True
+            entry['initialized']   = True
+        else:  # index
+            entry['values'][idx_val] = valor
+            entry['initialized']     = True
 
-        # — 5) Devuelvo rhs para encadenar —
+        # — 5) Devolver RHS para permitir encadenar —
         p[0] = rhs
+
+
 
 
     #endregion
@@ -557,7 +621,6 @@ class ParserClass:
         "expresion : ID CE expresion CA"
         nombre   = p[1]
         idx_expr = p[3]
-
         # 1) Comprobar que 'nombre' exista y sea un vector
         if nombre not in self.entorno:
             p[0] = f"Error: Variable '{nombre}' no declarada"
@@ -654,17 +717,31 @@ class ParserClass:
     def p_while_stmt(self, p):
         "while_stmt : WHILE expresion DPNTO NEWLINE LLE NEWLINE lista_sentencias LLA"
         cond = p[2]
-        # 1) Debe ser un dict con campo 'tipo'
-        if not isinstance(cond, dict) or 'tipo' not in cond:
-            p[0] = "Error interno: condición de 'while' sin tipo"
-            return
-        # 2) El tipo debe ser bool
-        if cond['tipo'] != 'bool':
-            p[0] = "Error semántico: la condición de 'while' debe ser booleana"
+        # 1) Propagar error semántico si ya viene marcado
+        if isinstance(cond, dict) and 'error' in cond:
+            p[0] = cond
             return
 
-        # Condición OK
-        p[0] = None
+        # 2) Verificar que sea bool
+        tipo_cond = cond.get('tipo') if isinstance(cond, dict) else None
+        if tipo_cond != 'bool':
+            p[0] = {
+                'error': f"Condición de 'while' debe ser bool, no {tipo_cond}",
+                'line': p.lineno(1)
+            }
+            return
+
+        # 3) Extraer el cuerpo del while (siempre en p[7])
+        body = p[7]
+
+        # 4) Construir nodo AST de while
+        p[0] = {
+            'node': 'while',
+            'cond': cond,
+            'body': body,
+            'line': p.lineno(1)
+        }
+
 
     #endregion
     #
@@ -750,26 +827,36 @@ class ParserClass:
     #
     #region 7. TIPOS
     #
+
+    def p_registro_tipo(self, p):
+        "registro_tipo : ID"
+        nombre = p[1]
+        if nombre not in self.tipos_registro:
+            # Si no existe como registro, error
+            raise SyntaxError(f"Tipo de registro '{nombre}' no definido")
+        p[0] = nombre
+
     def p_tipo(self, p):
-        """tipo : tipo_base
-                | tipo_base CE ENTERO CA
-                | ID
-                | ID CE ENTERO CA"""
-        # reutiliza tu versión que comprueba registros y vectores
-        if len(p)==2 and p.slice[1].type=='tipo_base':
-            p[0] = p[1]
-        elif len(p)==2:
-            nombre = p[1]
-            if nombre not in self.tipos_registro:
-                raise SyntaxError(f"Tipo '{nombre}' no definido")
-            p[0] = nombre
-        elif p.slice[1].type=='tipo_base':
-            p[0] = ( 'vector', p[1], p[3] )
+        """
+        tipo : tipo_base
+            | tipo_base CE ENTERO CA       
+            | registro_tipo               
+            | registro_tipo CE ENTERO CA   
+        """
+        if p.slice[1].type == 'tipo_base':
+            # caso primitivo
+            if len(p) == 2:
+                p[0] = p[1]
+            else:
+                # p[1] es primitivo, p[3] tamaño
+                p[0] = ('vector', p[1], int(p[3]))
         else:
-            base,size = p[1],p[3]
-            if base not in self.tipos_registro:
-                raise SyntaxError(f"Tipo '{base}' no definido")
-            p[0] = ('vector', base, size)
+            # p[1] vino de registro_tipo, ya validado
+            if len(p) == 2:
+                p[0] = p[1]
+            else:
+                # vector de registro
+                p[0] = ('vector', p[1], int(p[3]))
 
     def p_tipo_base(self, p):
         """tipo_base : INT

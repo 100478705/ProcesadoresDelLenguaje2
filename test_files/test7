@@ -7,15 +7,14 @@ def int foo() :
 {
     int x = 1 
     x = x + 1       # → 11, OK
-    flag = false    # modifica la variable global
     return x
 }
 
 # función con parámetro shadowing
 def int bar(int x) :
 {
-    b = 2
-    x = x * 2       # modifica el parámetro local, no la global
+    int b = 2
+    int x = 2       # modifica el parámetro local, no la global
     return x
 }
 

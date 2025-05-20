@@ -65,33 +65,27 @@ def analizar_parser(archivo):
         # 3) Escritura de símbolos solo si no hubo errores
         base = os.path.splitext(archivo)[0]
 
-        if not parser.entorno:
-            print("parser.entorno está vacío, no hay símbolos definidos.")
-        else:
-            with open(base + '.symbol', 'w') as f_sym:
-                for nombre, info in parser.entorno.items():
-                    if isinstance(info, dict) and info.get('type') == 'registro':
-                        tipo = info.get('tipo_registro')
-                    elif isinstance(info, dict):
-                        tipo = info['type']
-                    else:
-                        tipo = type(info).__name__
-                    f_sym.write(f"{nombre} : {tipo}\n")
-            print(f"Símbolos escritos en '{base}.symbol'")
+
+        with open(base + '.symbol', 'w') as f_sym:
+            for nombre, info in parser.entorno.items():
+                if isinstance(info, dict) and info.get('type') == 'registro':
+                    tipo = info.get('tipo_registro')
+                elif isinstance(info, dict):
+                    tipo = info['type']
+                else:
+                    tipo = type(info).__name__
+                f_sym.write(f"{nombre} : {tipo}\n")
 
         # 4) Escritura de registros
         if getattr(parser, 'tipos_registro', None) is not None:
-            if not parser.tipos_registro:
-                print("parser.tipos_registro existe pero está vacío.")
-            else:
-                with open(base + '.record', 'w') as f_rec:
-                    for nombre, props in parser.tipos_registro.items():
-                        if isinstance(props, dict):
-                            campos = ','.join(props.keys())
-                            f_rec.write(f"{nombre} : {campos}\n")
-                        else:
-                            print(f"Registro '{nombre}' ignorado: esperaba dict, obtuvo {type(props).__name__}")
-                print(f"Registros escritos en '{base}.record'")
+
+            with open(base + '.record', 'w') as f_rec:
+                for nombre, props in parser.tipos_registro.items():
+                    if isinstance(props, dict):
+                        campos = ','.join(props.keys())
+                        f_rec.write(f"{nombre} : {campos}\n")
+                    else:
+                        print(f"Registro '{nombre}' ignorado: esperaba dict, obtuvo {type(props).__name__}")
 
     except Exception as e:
         print(f"Error al ejecutar el parser: {e}")

@@ -1,3 +1,8 @@
-bool w = true
-int v = w
+type Persona:
+{
+    int nodo
+}
+Persona p
+p.nodo = 1.1
+
 
