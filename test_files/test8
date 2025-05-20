@@ -1,1 +1,3 @@
+bool w = true
+int v = w
 

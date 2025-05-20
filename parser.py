@@ -180,60 +180,61 @@ class ParserClass:
         "declaracion_variable : tipo lista_declaraciones"
         tipo_ast, declaracs = p[1], p[2]
 
-        # 1) Averiguamos si hay exactamente un inicializador explícito
-        explicit_inits = [expr for (_, expr) in declaracs if expr is not None]
-        default_init = explicit_inits[0] if len(explicit_inits) == 1 else None
-
         for nombre, init_expr in declaracs:
-            # 2) Si no tenía inicializador y había uno explícito, lo propagamos
-            if init_expr is None and default_init is not None:
-                init_expr = default_init
-
-            # 3) No repetir nombre
+            # 1) No repetir nombre
             if nombre in self.entorno:
                 p[0] = {'error': f"Variable '{nombre}' ya declarada",
                         'line': p.lineno(2)}
                 return
 
-            # 4) Si ahora tiene inicializador, propagamos errores previos
+            # 2) Si hay inicializador, primero propagamos errores de la expresión
             if init_expr is not None:
+                # a) Propagar error si existe
                 if isinstance(init_expr, dict) and 'error' in init_expr:
                     p[0] = init_expr
                     return
+
+                # b) Asegurarnos de que viene con tipo
                 if not isinstance(init_expr, dict) or 'tipo' not in init_expr:
                     p[0] = {'error': f"Inicializador de '{nombre}' sin tipo válido",
                             'line': p.lineno(2)}
                     return
 
-                # 5) Chequeo de compatibilidad estricta
                 init_type = init_expr['tipo']
-                numeric_rank = {'char':1, 'int':2, 'float':3}
-                if tipo_ast in numeric_rank:
-                    if init_type not in numeric_rank or numeric_rank[init_type] > numeric_rank[tipo_ast]:
+
+                # c) Chequeo de que el tipo de init coincide o es compatible
+                implicit = {'float': ['int'], 'int': ['char'], 'char': [], 'bool': []}
+                # — structs deben coincidir exactamente —
+                if isinstance(tipo_ast, str) and tipo_ast not in implicit:
+                    if init_type != tipo_ast:
                         p[0] = {'error': f"No se puede inicializar {tipo_ast} con {init_type}",
                                 'line': p.lineno(2)}
                         return
-                elif tipo_ast == 'bool':
-                    if init_type != 'bool':
-                        p[0] = {'error': f"No se puede inicializar bool con {init_type}",
-                                'line': p.lineno(2)}
-                        return
+                else:
+                    # primitivos con conversión implícita
+                    if init_type != tipo_ast:
+                        if tipo_ast in implicit and init_type in implicit[tipo_ast]:
+                            # permitir char→int o int→float
+                            pass
+                        else:
+                            p[0] = {'error': f"No se puede inicializar {tipo_ast} con {init_type}",
+                                    'line': p.lineno(2)}
+                            return
 
-                # 6) Insertamos con valor e initialized=True
+                # d) Insertamos la variable inicializada
                 self.entorno[nombre] = {
                     'type':        tipo_ast,
                     'value':       init_expr.get('valor'),
                     'initialized': True
                 }
             else:
-                # 7) Sin inicializador alguno
+                # 3) Sin inicializador: declaramos sin inicializar
                 self.entorno[nombre] = {
                     'type':        tipo_ast,
                     'value':       None,
                     'initialized': False
                 }
 
-        # 8) No devolvemos un AST concreto
         p[0] = None
 
     def p_lista_declaraciones(self, p):
@@ -247,7 +248,7 @@ class ParserClass:
             expr = p[3]
             # Inicializamos solo el último identificador
             p[0] = [(name, None) for name in ids[:-1]] + [(ids[-1], expr)]
-            
+
     #endregion
     #
     #region 3. ASIGNACIÓN
