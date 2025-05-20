@@ -14,6 +14,8 @@ class ParserClass:
         ('left',  'MUL', 'DIV'),
         ('right', 'NOT'),
         ('right', 'UPLUS', 'UMINUS'),
+        ('right','EQ'),
+        ('left', 'COMA'),
         # ——— aquí bajamos de nivel a los postfijos ———
         ('left',  'PNTO'),            
         ('left',  'PE', 'PA'),        
@@ -84,7 +86,7 @@ class ParserClass:
 
     ## Declaración de registros
     def p_tipo_registro_decl(self, p):
-        "tipo_registro_decl : TYPE ID DPNTO opt_newline LLE opt_newline bloque_propiedades opt_newline LLA"
+        "tipo_registro_decl : TYPE ID DPNTO NEWLINE LLE NEWLINE bloque_propiedades LLA"
         
         nombre = p[2]
         props  = p[7]     # dict {campo:tipo}
@@ -130,9 +132,9 @@ class ParserClass:
     ## Declaracion variables
 
     def p_bloque_propiedades(self, p):
-        """bloque_propiedades : propiedad bloque_propiedades
-                              | propiedad"""
-        if len(p) == 2:
+        """bloque_propiedades : propiedad NEWLINE bloque_propiedades
+                              | propiedad NEWLINE"""
+        if len(p) == 3:
             p[0] = p[1]
         else:
             d = p[2]
@@ -140,7 +142,7 @@ class ParserClass:
             p[0] = d
 
     def p_propiedad(self, p):
-        "propiedad : tipo lista_identificadores NEWLINE"
+        "propiedad : tipo lista_identificadores"
         tipo = p[1]
         ids  = p[2]
         # construyo dict {nombre:tipo}
@@ -165,12 +167,13 @@ class ParserClass:
         # — VECTORES —
         if isinstance(tipo_ast, tuple) and tipo_ast[0]=='vector':
             base, size = tipo_ast[1], int(tipo_ast[2])
-            if size<=0:
+            if size <= 0:
                 raise SyntaxError(f"Tamaño inválido: {base}[{size}]")
             for nombre, _ in declaracs:
                 self.entorno[nombre] = {
-                    'type':'vector','base':base,'size':size,
-                    'values':[None]*size
+                    'type': 'vector', 'base': base, 'size': size,
+                    'values': [None] * size,
+                    'initialized': False
                 }
                 mensajes.append(f"Vector {nombre}[{size}] de {base}")
         # — ESCALARES —
@@ -179,25 +182,36 @@ class ParserClass:
             for nombre, _ in declaracs:
                 if nombre in self.entorno:
                     raise SyntaxError(f"'{nombre}' ya declarado")
-                self.entorno[nombre] = {'type':tipo,'value':None}
+                self.entorno[nombre] = {
+                    'type': tipo,
+                    'value': None,
+                    'initialized': False
+                }
                 mensajes.append(f"Variable '{nombre}' de tipo {tipo}")
         p[0] = "\n".join(mensajes)
 
 
+    def p_declaracion(self, p):
+        """declaracion : ID
+                    | ID EQ expresion"""
+        if len(p) == 2:
+            # Sólo nombre, sin inicializar
+            p[0] = (p[1], None)
+        else:
+            # Declaración con inicialización
+            p[0] = (p[1], p[3])
+
+
     def p_lista_declaraciones(self, p):
-        """lista_declaraciones : ID
-                               | ID EQ expresion
-                               | ID COMA lista_declaraciones"""
-        # construye lista de tuplas (identificador, expresion|None)
-        if len(p)==2:
-            p[0] = [(p[1], None)]
+        """lista_declaraciones : declaracion
+                            | lista_declaraciones COMA declaracion"""
+        if len(p) == 2:
+            # Lista de un solo elemento
+            p[0] = [p[1]]
+        else:
+            # Agregar la nueva declaración al final
+            p[0] = p[1] + [p[3]]
 
-        elif len(p)==4 and p[2]==',':
-            p[0] = [(p[1],None)] + p[3]
-
-        elif p[2]=='=':
-            rest = [] if len(p)==4 else p[4]
-            p[0] = [(p[1],p[3])] + rest
 
     #endregion
     #
@@ -212,7 +226,7 @@ class ParserClass:
         lhs = p[1]
         rhs = p[3]
 
-        # — 1) Determinar destino (var o campo de registro) —
+        # — 1) Determinar destino (var o campo) —
         if isinstance(lhs, tuple) and lhs[0] == 'field':
             _, var_name, field = lhs
             if var_name not in self.entorno:
@@ -230,40 +244,36 @@ class ParserClass:
             tipo_dest = entry['type']
             destino_kind = 'var'
 
-        # — 2) RHS debe ser un dict con 'tipo' —
+        # — 2) RHS debe ser dict con 'tipo' —
         if not isinstance(rhs, dict) or 'tipo' not in rhs:
             p[0] = "Error interno: RHS no tiene tipo válido"
             return
         tipo_orig = rhs['tipo']
         valor     = rhs.get('valor', None)
 
-        # — 3) Reglas de compatibilidad estricta sin cambio de tipo —
+        # — 3) Compatibilidad estricta —
         numeric_rank = {'char':1, 'int':2, 'float':3}
         if tipo_dest in numeric_rank:
-            # destino numérico: permitir sólo if orig ≤ dest
             if tipo_orig not in numeric_rank or numeric_rank[tipo_orig] > numeric_rank[tipo_dest]:
                 p[0] = f"Error: no se puede asignar {tipo_orig} a {tipo_dest}"
                 return
         elif tipo_dest == 'bool':
-            # destino bool: sólo bool → bool
             if tipo_orig != 'bool':
                 p[0] = f"Error: no se puede asignar {tipo_orig} a {tipo_dest}"
                 return
-            else:
-                # Para los structs
-                if isinstance(tipo_dest, str) and tipo_orig != tipo_dest:
-                    p[0] = f"Error: no se puede asignar {tipo_orig} a {tipo_dest}"
-            return
 
-        # — 4) Hacer la asignación —
+        # — 4) Hacer la asignación y marcar init —
         if destino_kind == 'var':
             entry['value'] = valor
+            entry['initialized'] = True
         else:
             if entry.get('value') is None:
                 entry['value'] = {}
             entry['value'][field] = valor
+            # asumimos que el registro entero cuenta como inicializado
+            entry['initialized'] = True
 
-        # — 5) Devuelvo rhs para permitir encadenar asignaciones —
+        # — 5) Devuelvo rhs para encadenar —
         p[0] = rhs
 
 
@@ -273,59 +283,110 @@ class ParserClass:
     #
     def p_expresion_binaria(self, p):
         """expresion : expresion SUM expresion
-                     | expresion RES expresion
-                     | expresion MUL expresion
-                     | expresion DIV expresion
-                     | expresion AND expresion
-                     | expresion OR expresion
-                     | expresion I expresion
-                     | expresion M expresion
-                     | expresion m expresion
-                     | expresion MI expresion
-                     | expresion mI expresion"""
-        p[0] = None
+                    | expresion RES expresion
+                    | expresion MUL expresion
+                    | expresion DIV expresion
+                    | expresion AND expresion
+                    | expresion OR expresion
+                    | expresion I expresion
+                    | expresion M expresion
+                    | expresion m expresion
+                    | expresion MI expresion
+                    | expresion mI expresion"""
+        izq, op, der = p[1], p[2], p[3]
+        # 1) Propagar errores de las sub-expresiones
+        for side in (izq, der):
+            if isinstance(side, dict) and 'error' in side:
+                p[0] = side
+                return
+
+        # 2) Aritméticas: + - * /
+        if op in ('SUM', 'RES', 'MUL', 'DIV'):
+            if izq['tipo'] not in ('int', 'float') or der['tipo'] not in ('int', 'float'):
+                p[0] = {
+                    'error': f"Operador '{op}' requiere operandos numéricos, no {izq['tipo']} y {der['tipo']}",
+                    'line': p.lineno(2)
+                }
+            else:
+                result_type = 'float' if 'float' in (izq['tipo'], der['tipo']) else 'int'
+                p[0] = {'tipo': result_type, 'valor': None}
+            return
+
+        # 3) Lógicos: AND, OR
+        if op in ('AND', 'OR'):
+            if izq['tipo'] != 'bool' or der['tipo'] != 'bool':
+                p[0] = {
+                    'error': f"Operador lógico '{op}' requiere booleanos, no {izq['tipo']} y {der['tipo']}",
+                    'line': p.lineno(2)
+                }
+            else:
+                p[0] = {'tipo': 'bool', 'valor': None}
+            return
+
+        # 4) Relacionales personalizados: I, M, m, MI, mI
+        if op in ('I', 'M', 'm', 'MI', 'mI'):
+            if izq['tipo'] != 'int' or der['tipo'] != 'int':
+                p[0] = {
+                    'error': f"Operador relacional '{op}' requiere enteros, no {izq['tipo']} y {der['tipo']}",
+                    'line': p.lineno(2)
+                }
+            else:
+                p[0] = {'tipo': 'bool', 'valor': None}
+            return
+
+        # 5) Por si filtra algún otro operador 
+        p[0] = {
+            'error': f"Operador desconocido '{op}'",
+            'line': p.lineno(2)
+        }
 
     # Unarios
 
     def p_expresion_uminus(self, p):
         'expresion : RES expresion %prec UMINUS'
         expr = p[2]
-        # 1) Verificar que la sub-expresión tenga un dict con 'tipo'
-        if not isinstance(expr, dict) or 'tipo' not in expr:
-            p[0] = "Error interno: expresión sin tipo"
+        # 1) Propagar error si existe
+        if isinstance(expr, dict) and 'error' in expr:
+            p[0] = expr
             return
-        # 2) – unario solo sobre int o float
+        # 2) Sólo sobre int o float
         if expr['tipo'] not in ('int', 'float'):
-            p[0] = (f"Error semántico: operador unario '{p[1]}' "
-                    f"requiere int o float, no {expr['tipo']}")
-            return
-        # 3) Propagar tipo
-        p[0] = {'tipo': expr['tipo']}
+            p[0] = {
+                'error': f"Operador unario '{p[1]}' requiere int o float, no {expr['tipo']}",
+                'line': p.lineno(1)
+            }
+        else:
+            p[0] = {'tipo': expr['tipo'], 'valor': None}
 
 
     def p_expresion_uplus(self, p):
         'expresion : SUM expresion %prec UPLUS'
         expr = p[2]
-        if not isinstance(expr, dict) or 'tipo' not in expr:
-            p[0] = "Error interno: expresión sin tipo"
+        if isinstance(expr, dict) and 'error' in expr:
+            p[0] = expr
             return
         if expr['tipo'] not in ('int', 'float'):
-            p[0] = (f"Error semántico: operador unario '{p[1]}' "
-                    f"requiere int o float, no {expr['tipo']}")
-            return
-        p[0] = {'tipo': expr['tipo']}
+            p[0] = {
+                'error': f"Operador unario '{p[1]}' requiere int o float, no {expr['tipo']}",
+                'line': p.lineno(1)
+            }
+        else:
+            p[0] = {'tipo': expr['tipo'], 'valor': None}
 
 
     def p_expresion_not(self, p):
         'expresion : NOT expresion'
         expr = p[2]
-        if not isinstance(expr, dict) or 'tipo' not in expr:
-            p[0] = "Error interno: expresión sin tipo"
+        if isinstance(expr, dict) and 'error' in expr:
+            p[0] = expr
             return
         if expr['tipo'] != 'bool':
-            p[0] = "Error semántico: 'not' requiere expresión booleana"
-            return
-        p[0] = {'tipo': 'bool'}
+            p[0] = {
+                'error': "Operador 'not' requiere expresión booleana",
+                'line': p.lineno(1)
+            }
+        else:
+            p[0] = {'tipo': 'bool', 'valor': None}
 
 
     def p_expresion_func(self, p):
@@ -333,17 +394,19 @@ class ParserClass:
                     | SEN expresion
                     | LOG expresion
                     | EXP expresion'''
-        op   = p.slice[1].type   # 'COS','SEN','LOG','EXP'
-        expr = p[2]
-        if not isinstance(expr, dict) or 'tipo' not in expr:
-            p[0] = "Error interno: expresión sin tipo"
+        op_token = p.slice[1].type  # 'COS','SEN','LOG','EXP'
+        expr     = p[2]
+        if isinstance(expr, dict) and 'error' in expr:
+            p[0] = expr
             return
         if expr['tipo'] not in ('int', 'float'):
-            p[0] = (f"Error semántico: operador '{p[1].lower()}' "
-                    f"requiere int o float, no {expr['tipo']}")
-            return
-        # las funciones trig/log retornan float
-        p[0] = {'tipo': 'float'}
+            p[0] = {
+                'error': f"Función '{op_token.lower()}' requiere int o float, no {expr['tipo']}",
+                'line': p.lineno(1)
+            }
+        else:
+            # trig/log siempre float
+            p[0] = {'tipo': 'float', 'valor': None}
 
     def p_expresion_group(self, p):
         "expresion : PE expresion PA"
@@ -351,26 +414,33 @@ class ParserClass:
 
     def p_expresion_literal(self, p):
         """expresion : ENTERO
-                     | REAL
-                     | CARACTER
-                     | TRUE
-                     | FALSE"""
-        p[0] = {'tipo': ('int' if isinstance(p[1],int)
-                         else 'float' if isinstance(p[1],float)
-                         else 'char' if isinstance(p[1],str)
-                         else 'bool')}
+                    | REAL
+                    | CARACTER
+                    | TRUE
+                    | FALSE"""
+        tok_type = p.slice[1].type
+        val      = p[1]
+        if tok_type == 'ENTERO':
+            p[0] = {'tipo': 'int',   'valor': int(val)}
+        elif tok_type == 'REAL':
+            p[0] = {'tipo': 'float', 'valor': float(val)}
+        elif tok_type == 'CARACTER':
+            p[0] = {'tipo': 'char',  'valor': val}
+        else:  # TRUE o FALSE
+            p[0] = {'tipo': 'bool',  'valor': (tok_type == 'TRUE')}
 
     def p_expresion_id(self, p):
         "expresion : ID"
         nombre = p[1]
         if nombre not in self.entorno:
-            p[0] = f"Error: '{nombre}' no declarado"
+            p[0] = {'error': f"Variable '{nombre}' no declarada", 'line': p.lineno(1)}
+        elif not self.entorno[nombre].get('initialized', False):
+            p[0] = {'error': f"Variable '{nombre}' no inicializada", 'line': p.lineno(1)}
         else:
-            entry = self.entorno[nombre]
-            if entry.get('type')=='vector':
-                p[0] = entry
-            else:
-                p[0] = {'tipo': entry['type'], 'valor': entry['value']}
+            p[0] = {
+                'tipo': self.entorno[nombre]['type'],
+                'valor': self.entorno[nombre].get('value')
+            }
 
 
     def p_expresion_func_call(self, p):
@@ -423,16 +493,26 @@ class ParserClass:
         p[0] = {'tipo': ret_type, 'valor': None}
 
 
+    # lista_expresiones ya no es recursiva ni tiene empty interno
     def p_lista_expresiones(self, p):
-        """lista_expresiones : expresion
-                             | expresion COMA lista_expresiones
-                             | empty"""
-        if len(p)==2 and p[1] is None:
+        """lista_expresiones : empty
+                            | expresion_list"""
+        # si vino por empty, devolvemos lista vacía
+        if p[1] is None:
             p[0] = []
-        elif len(p)==2:
+        else:
+            p[0] = p[1]
+
+    # toda la recursión de comas la manejamos aquí, sin empty
+    def p_expresion_list(self, p):
+        """expresion_list : expresion
+                        | expresion_list COMA expresion"""
+        if len(p) == 2:
+            # caso base: un solo elemento
             p[0] = [p[1]]
         else:
-            p[0] = [p[1]] + p[3]
+            # recursión izquierda: añadimos al final
+            p[0] = p[1] + [p[3]]
 
     # acceso a vector
     def p_expresion_index(self, p):
@@ -500,25 +580,41 @@ class ParserClass:
     #region 5. CONTROL DE FLUJO
     #
     def p_if_stmt(self, p):
-        """if_stmt : IF expresion DPNTO opt_newline LLE opt_newline lista_sentencias opt_newline LLA
-                | IF expresion DPNTO opt_newline LLE opt_newline lista_sentencias opt_newline LLA opt_newline ELSE opt_newline LLE opt_newline lista_sentencias opt_newline LLA """
+        r"""if_stmt : IF expresion DPNTO NEWLINE LLE NEWLINE lista_sentencias LLA
+                    | IF expresion DPNTO NEWLINE LLE NEWLINE lista_sentencias LLA ELSE NEWLINE LLE NEWLINE lista_sentencias LLA"""
         cond = p[2]
-        # 1) Debe ser un dict con campo 'tipo'
-        if not isinstance(cond, dict) or 'tipo' not in cond:
-            p[0] = "Error interno: condición de 'if' sin tipo"
+        # 1) Propagar error semántico de la condición
+        if isinstance(cond, dict) and 'error' in cond:
+            p[0] = cond
             return
-        # 2) El tipo debe ser bool
-        if cond['tipo'] != 'bool':
-            p[0] = "Error semántico: la condición de 'if' debe ser booleana"
+        # 2) Verificar que sea bool
+        if cond.get('tipo') != 'bool':
+            p[0] = {
+                'error': f"Condición de 'if' debe ser bool, no {cond.get('tipo')}",
+                'line': p.lineno(1)
+            }
             return
+        # 3) Extraer then-block (siempre en p[7])
+        then_block = p[7]
+        # 4) ¿Hay else? Si p tiene más de 9 elementos, la alternativa larga fue usada
+        if len(p) > 9:
+            else_block = p[13]
+        else:
+            else_block = []
+        # 5) Construir nodo AST
+        p[0] = {
+            'node': 'if',
+            'cond': cond,
+            'then': then_block,
+            'else': else_block,
+            'line': p.lineno(1)
+        }
 
-        # Si llegamos aquí, la condición es válida
-        # (aquí podrías construir un nodo AST o simplemente continuar)
-        p[0] = None
+
 
 
     def p_while_stmt(self, p):
-        "while_stmt : WHILE expresion DPNTO opt_newline LLE opt_newline lista_sentencias opt_newline LLA"
+        "while_stmt : WHILE expresion DPNTO NEWLINE LLE NEWLINE lista_sentencias LLA"
         cond = p[2]
         # 1) Debe ser un dict con campo 'tipo'
         if not isinstance(cond, dict) or 'tipo' not in cond:
@@ -541,11 +637,24 @@ class ParserClass:
         p[0] = None
 
     def p_lista_param(self, p):
-        """lista_param : 
-                       | param COMA lista_param
-                       | param"""
-        # construir lista de (tipo,nombre)
-        p[0] = []
+        """lista_param : empty
+                    | param_list"""
+        # si empty, devolvemos lista vacía
+        if p[1] is None:
+            p[0] = []
+        else:
+            p[0] = p[1]
+
+    def p_param_list(self, p):
+        """param_list : param
+                    | param_list COMA param"""
+        if len(p) == 2:
+            # un solo parámetro
+            p[0] = [p[1]]
+        else:
+            # concatenamos al final
+            p[0] = p[1] + [p[3]]
+
 
     def p_param(self, p):
         "param : tipo ID"
@@ -600,11 +709,6 @@ class ParserClass:
             return
         # En cualquier otro caso, lo reportamos
         print(f"Error sintáctico en token '{p.value}' (línea {p.lineno})")
-
-
-    def p_opt_newline(self, p):
-        r"""opt_newline : 
-                        | NEWLINE opt_newline"""
 
     def parse(self, texto):
         return self.parser.parse(texto, lexer=self.lexer)
