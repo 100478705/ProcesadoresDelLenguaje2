@@ -35,6 +35,8 @@ def analizar_lexico(archivo):
         print(f"Error durante el análisis léxico: {e}")
         traceback.print_exc()
 
+
+
 def analizar_parser(archivo):
     parser = ParserClass(archivo)
     parser.entorno = {}
@@ -45,12 +47,24 @@ def analizar_parser(archivo):
         with open(archivo, 'r') as f:
             contenido = f.read()
 
-        # 2) Parseamos el contenido
-        parser.parse(contenido)
+        # 2) Parseamos el contenido y capturamos el resultado
+        resultado = parser.parse(contenido)
+        # 2.a) Comprobamos errores semánticos individuales
+        # Si parse devuelve un dict con 'error', lo mostramos y salimos
+        if isinstance(resultado, dict) and 'error' in resultado:
+            print(f"Error semántico: {resultado['error']} en línea {resultado.get('line')}")
+            return
 
+        # Si es una lista de sentencias, buscamos errores dentro
+        if isinstance(resultado, list):
+            for nodo in resultado:
+                if isinstance(nodo, dict) and 'error' in nodo:
+                    print(f"Error semántico: {nodo['error']} en línea {nodo.get('line')}")
+                    return
+
+        # 3) Escritura de símbolos solo si no hubo errores
         base = os.path.splitext(archivo)[0]
 
-        # 3) Escritura de símbolos
         if not parser.entorno:
             print("parser.entorno está vacío, no hay símbolos definidos.")
         else:
@@ -76,9 +90,8 @@ def analizar_parser(archivo):
                             campos = ','.join(props.keys())
                             f_rec.write(f"{nombre} : {campos}\n")
                         else:
-                            # Aviso en consola y salto
                             print(f"Registro '{nombre}' ignorado: esperaba dict, obtuvo {type(props).__name__}")
-                    print(f"Registros escritos en '{base}.record'")
+                print(f"Registros escritos en '{base}.record'")
 
     except Exception as e:
         print(f"Error al ejecutar el parser: {e}")

@@ -1,5 +1,26 @@
-int f = 0.1
-if 3: 
+# ámbito global
+int x = 5
+bool flag = true
+
+# función sin parámetros, declara x localmente
+def int foo() :
 {
-    int v = 1
+    int x = 1 
+    x = x + 1       # → 11, OK
+    flag = false    # modifica la variable global
+    return x
 }
+
+# función con parámetro shadowing
+def int bar(int x) :
+{
+    b = 2
+    x = x * 2       # modifica el parámetro local, no la global
+    return x
+}
+
+# llamadas y usos en global tras las funciones
+int result1 = foo()        # result1 debe ser 11
+int result2 = bar(x)       # result2 = 5*2 = 10
+x = x + 1                  # x global pasa de 5 a 6
+

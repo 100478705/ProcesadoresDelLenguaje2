@@ -1,2 +1,4 @@
-f : int
-v : int
+x : int
+flag : bool
+result1 : int
+result2 : int

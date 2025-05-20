@@ -1,9 +1,4 @@
 fa : int
 a : int
 y : int
-z : char
-b : bool
-alfa : float
-vec : vector
-vector_lenght : int
-per : vector
+b : int

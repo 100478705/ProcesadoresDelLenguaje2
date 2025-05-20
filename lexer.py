@@ -53,10 +53,12 @@ class LexerClass:
         'PNTO',
         'AND',
         'OR',
-        'DPNTO'
+        'DPNTO',
+        'PNTOCOMA'
     ) + tuple(reserved.values())
     t_ignore = ' \t'
 
+    t_PNTOCOMA = r';'
     t_EQ = r'='
     t_SUM = r'\+'
     t_RES = r'\-'

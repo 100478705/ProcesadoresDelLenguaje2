@@ -37,6 +37,7 @@ class ParserClass:
         )
         self.entorno = {}            # variables y vectores
         self.tipos_registro = {}     # tipos registro definidos
+        self.entorno_stack = []      # pila de entornos para funciones
         self.func_prototypes = {}
 
 
@@ -49,14 +50,27 @@ class ParserClass:
 
     def p_lista_sentencias(self, p):
         """lista_sentencias :
-                             | lista_sentencias sentencia"""
+                        | lista_sentencias sentencia"""
         if len(p) == 1:
             p[0] = []
         else:
-            if isinstance(p[2], type(p[1][0]) if p[1] else object):
-                p[0] = p[1] + [p[2]]
+            prev = p[1]
+            sent = p[2]
+            # 1) Si el acumulado anterior ya es un error, lo propagamos
+            if isinstance(prev, dict) and 'error' in prev:
+                p[0] = prev
+            # 2) Si la nueva sentencia es un error, lo propagamos
+            elif isinstance(sent, dict) and 'error' in sent:
+                p[0] = sent
             else:
-                p[0] = p[1]
+                # 3) Añadimos todo lo que no sea None
+                if sent is not None:
+                    p[0] = prev + [sent]
+                else:
+                    p[0] = prev
+
+
+
 
     def p_sentencia(self, p):
         r"""sentencia : declaracion_variable NEWLINE
@@ -75,7 +89,6 @@ class ParserClass:
         else:
             # para los demás casos devolvemos el AST de la sentencia
             p[0] = p[1]
-        p[0] = None
 
 
     #endregion
@@ -133,13 +146,17 @@ class ParserClass:
 
     def p_bloque_propiedades(self, p):
         """bloque_propiedades : propiedad NEWLINE bloque_propiedades
-                              | propiedad NEWLINE"""
+                            | propiedad NEWLINE"""
+        # caso base: una sola propiedad seguida de salto
         if len(p) == 3:
             p[0] = p[1]
         else:
-            d = p[2]
+            # p[3] es el dict de las propiedades "restantes"
+            d = p[3]
+            # añadimos los campos de la cabeza
             d.update(p[1])
             p[0] = d
+
 
     def p_propiedad(self, p):
         "propiedad : tipo lista_identificadores"
@@ -162,57 +179,75 @@ class ParserClass:
     def p_declaracion_variable(self, p):
         "declaracion_variable : tipo lista_declaraciones"
         tipo_ast, declaracs = p[1], p[2]
-        mensajes = []
 
-        # — VECTORES —
-        if isinstance(tipo_ast, tuple) and tipo_ast[0]=='vector':
-            base, size = tipo_ast[1], int(tipo_ast[2])
-            if size <= 0:
-                raise SyntaxError(f"Tamaño inválido: {base}[{size}]")
-            for nombre, _ in declaracs:
+        # 1) Averiguamos si hay exactamente un inicializador explícito
+        explicit_inits = [expr for (_, expr) in declaracs if expr is not None]
+        default_init = explicit_inits[0] if len(explicit_inits) == 1 else None
+
+        for nombre, init_expr in declaracs:
+            # 2) Si no tenía inicializador y había uno explícito, lo propagamos
+            if init_expr is None and default_init is not None:
+                init_expr = default_init
+
+            # 3) No repetir nombre
+            if nombre in self.entorno:
+                p[0] = {'error': f"Variable '{nombre}' ya declarada",
+                        'line': p.lineno(2)}
+                return
+
+            # 4) Si ahora tiene inicializador, propagamos errores previos
+            if init_expr is not None:
+                if isinstance(init_expr, dict) and 'error' in init_expr:
+                    p[0] = init_expr
+                    return
+                if not isinstance(init_expr, dict) or 'tipo' not in init_expr:
+                    p[0] = {'error': f"Inicializador de '{nombre}' sin tipo válido",
+                            'line': p.lineno(2)}
+                    return
+
+                # 5) Chequeo de compatibilidad estricta
+                init_type = init_expr['tipo']
+                numeric_rank = {'char':1, 'int':2, 'float':3}
+                if tipo_ast in numeric_rank:
+                    if init_type not in numeric_rank or numeric_rank[init_type] > numeric_rank[tipo_ast]:
+                        p[0] = {'error': f"No se puede inicializar {tipo_ast} con {init_type}",
+                                'line': p.lineno(2)}
+                        return
+                elif tipo_ast == 'bool':
+                    if init_type != 'bool':
+                        p[0] = {'error': f"No se puede inicializar bool con {init_type}",
+                                'line': p.lineno(2)}
+                        return
+
+                # 6) Insertamos con valor e initialized=True
                 self.entorno[nombre] = {
-                    'type': 'vector', 'base': base, 'size': size,
-                    'values': [None] * size,
+                    'type':        tipo_ast,
+                    'value':       init_expr.get('valor'),
+                    'initialized': True
+                }
+            else:
+                # 7) Sin inicializador alguno
+                self.entorno[nombre] = {
+                    'type':        tipo_ast,
+                    'value':       None,
                     'initialized': False
                 }
-                mensajes.append(f"Vector {nombre}[{size}] de {base}")
-        # — ESCALARES —
-        else:
-            tipo = tipo_ast
-            for nombre, _ in declaracs:
-                if nombre in self.entorno:
-                    raise SyntaxError(f"'{nombre}' ya declarado")
-                self.entorno[nombre] = {
-                    'type': tipo,
-                    'value': None,
-                    'initialized': False
-                }
-                mensajes.append(f"Variable '{nombre}' de tipo {tipo}")
-        p[0] = "\n".join(mensajes)
 
-
-    def p_declaracion(self, p):
-        """declaracion : ID
-                    | ID EQ expresion"""
-        if len(p) == 2:
-            # Sólo nombre, sin inicializar
-            p[0] = (p[1], None)
-        else:
-            # Declaración con inicialización
-            p[0] = (p[1], p[3])
-
+        # 8) No devolvemos un AST concreto
+        p[0] = None
 
     def p_lista_declaraciones(self, p):
-        """lista_declaraciones : declaracion
-                            | lista_declaraciones COMA declaracion"""
+        """lista_declaraciones : lista_identificadores
+                                | lista_identificadores EQ expresion"""
+        ids = p[1]        # lista de nombres
         if len(p) == 2:
-            # Lista de un solo elemento
-            p[0] = [p[1]]
+            # sin inicializador: todos None
+            p[0] = [(name, None) for name in ids]
         else:
-            # Agregar la nueva declaración al final
-            p[0] = p[1] + [p[3]]
-
-
+            expr = p[3]
+            # Inicializamos solo el último identificador
+            p[0] = [(name, None) for name in ids[:-1]] + [(ids[-1], expr)]
+            
     #endregion
     #
     #region 3. ASIGNACIÓN
@@ -293,18 +328,19 @@ class ParserClass:
                     | expresion m expresion
                     | expresion MI expresion
                     | expresion mI expresion"""
-        izq, op, der = p[1], p[2], p[3]
-        # 1) Propagar errores de las sub-expresiones
+        izq, der = p[1], p[3]
+        op_type = p.slice[2].type
+        # 1) Propagar errores
         for side in (izq, der):
             if isinstance(side, dict) and 'error' in side:
                 p[0] = side
                 return
 
-        # 2) Aritméticas: + - * /
-        if op in ('SUM', 'RES', 'MUL', 'DIV'):
+        # 2) Aritméticas
+        if op_type in ('SUM', 'RES', 'MUL', 'DIV'):
             if izq['tipo'] not in ('int', 'float') or der['tipo'] not in ('int', 'float'):
                 p[0] = {
-                    'error': f"Operador '{op}' requiere operandos numéricos, no {izq['tipo']} y {der['tipo']}",
+                    'error': f"Operador '{op_type}' requiere operandos numéricos, no {izq['tipo']} y {der['tipo']}",
                     'line': p.lineno(2)
                 }
             else:
@@ -312,33 +348,34 @@ class ParserClass:
                 p[0] = {'tipo': result_type, 'valor': None}
             return
 
-        # 3) Lógicos: AND, OR
-        if op in ('AND', 'OR'):
+        # 3) Lógicos
+        if op_type in ('AND', 'OR'):
             if izq['tipo'] != 'bool' or der['tipo'] != 'bool':
                 p[0] = {
-                    'error': f"Operador lógico '{op}' requiere booleanos, no {izq['tipo']} y {der['tipo']}",
+                    'error': f"Operador lógico '{op_type}' requiere booleanos, no {izq['tipo']} y {der['tipo']}",
                     'line': p.lineno(2)
                 }
             else:
                 p[0] = {'tipo': 'bool', 'valor': None}
             return
 
-        # 4) Relacionales personalizados: I, M, m, MI, mI
-        if op in ('I', 'M', 'm', 'MI', 'mI'):
+        # 4) Relacionales personalizados
+        if op_type in ('I', 'M', 'm', 'MI', 'mI'):
             if izq['tipo'] != 'int' or der['tipo'] != 'int':
                 p[0] = {
-                    'error': f"Operador relacional '{op}' requiere enteros, no {izq['tipo']} y {der['tipo']}",
+                    'error': f"Operador relacional '{op_type}' requiere enteros, no {izq['tipo']} y {der['tipo']}",
                     'line': p.lineno(2)
                 }
             else:
                 p[0] = {'tipo': 'bool', 'valor': None}
             return
 
-        # 5) Por si filtra algún otro operador 
+        # 5) Desconocido
         p[0] = {
-            'error': f"Operador desconocido '{op}'",
+            'error': f"Operador desconocido '{op_type}'",
             'line': p.lineno(2)
         }
+
 
     # Unarios
 
@@ -506,7 +543,7 @@ class ParserClass:
     # toda la recursión de comas la manejamos aquí, sin empty
     def p_expresion_list(self, p):
         """expresion_list : expresion
-                        | expresion_list COMA expresion"""
+                        | expresion_list NEWLINE expresion"""
         if len(p) == 2:
             # caso base: un solo elemento
             p[0] = [p[1]]
@@ -581,7 +618,7 @@ class ParserClass:
     #
     def p_if_stmt(self, p):
         r"""if_stmt : IF expresion DPNTO NEWLINE LLE NEWLINE lista_sentencias LLA
-                    | IF expresion DPNTO NEWLINE LLE NEWLINE lista_sentencias LLA ELSE NEWLINE LLE NEWLINE lista_sentencias LLA"""
+                    | IF expresion DPNTO NEWLINE LLE NEWLINE lista_sentencias LLA ELSE DPNTO NEWLINE LLE NEWLINE lista_sentencias LLA"""
         cond = p[2]
         # 1) Propagar error semántico de la condición
         if isinstance(cond, dict) and 'error' in cond:
@@ -633,8 +670,53 @@ class ParserClass:
     #region 6. FUNCIONES
     #
     def p_function_decl(self, p):
-        "function_decl : DEF tipo ID PE lista_param PA DPNTO LLE lista_sentencias return_stmt LLA"
+        "function_decl : DEF tipo ID PE lista_param PA DPNTO NEWLINE LLE NEWLINE push_scope lista_sentencias return_stmt pop_scope LLA"
+        # 1) Registrar prototipo
+        ret_type = p[2]
+        name     = p[3]
+        params   = p[5]
+        self.func_prototypes[name] = {
+            'params':   params,
+            'ret_type': ret_type,
+        }
+
+        # 2) Inicializar parámetros en ámbito local
+        for ptype, pname in params:
+            self.entorno[pname] = {
+                'type':        ptype,
+                'value':       None,
+                'initialized': True,
+            }
+
+        # 3) Recoger cuerpo y return (pueden ser None)
+        body = p[11]
+        ret  = p[12]
+
+        # 4) Si body es None, lo convertimos en lista vacía
+        if body is None:
+            body = []
+
+        # 5) Propagar error si body es un dict de error
+        if isinstance(body, dict) and 'error' in body:
+            p[0] = body
+            return
+
+        # 6) Buscar errores dentro de la lista de sentencias
+        for stmt in body:
+            if isinstance(stmt, dict) and 'error' in stmt:
+                p[0] = stmt
+                return
+
+        # 7) Propagar error en el return
+        if isinstance(ret, dict) and 'error' in ret:
+            p[0] = ret
+            return
+
+        # 8) Todo OK: salimos del ámbito local
         p[0] = None
+
+
+
 
     def p_lista_param(self, p):
         """lista_param : empty
@@ -647,7 +729,7 @@ class ParserClass:
 
     def p_param_list(self, p):
         """param_list : param
-                    | param_list COMA param"""
+                    | param_list PNTOCOMA param"""
         if len(p) == 2:
             # un solo parámetro
             p[0] = [p[1]]
@@ -699,6 +781,18 @@ class ParserClass:
     #
     #region 8. UTILITY
     #
+
+    def p_push_scope(self, p):
+        "push_scope :"
+        # guarda el entorno actual y crea uno nuevo
+        self.entorno_stack.append(self.entorno)
+        self.entorno = {}
+
+    def p_pop_scope(self, p):
+        "pop_scope :"
+        # restaura el entorno anterior
+        self.entorno = self.entorno_stack.pop()
+
     def p_empty(self, p):
         "empty :"
         p[0] = None
@@ -711,5 +805,5 @@ class ParserClass:
         print(f"Error sintáctico en token '{p.value}' (línea {p.lineno})")
 
     def parse(self, texto):
-        return self.parser.parse(texto, lexer=self.lexer)
-    
+        # Activamos el tracking aquí para que p.lineno() funcione
+        return self.parser.parse(texto, lexer=self.lexer, tracking=True)
