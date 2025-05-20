@@ -1,13 +1,14 @@
-#adsad
-+ 0b1010 10.2
-+ 0xFF00 4
-TRUE = true
-#asdfsadf
-00000010.1
-000000002
-abs a c f
-char a
-9.87e-2
-'$'
-astro$náuta
-int = 1 2 3 123     {asd 1   123     2}
+#FUNCIONES
+
+int b = 2
+
+
+def int func ( int a ): 
+{
+    int b = 2
+    int c = 2 + b
+    return c
+}
+
+int resultado = func(12) 
+

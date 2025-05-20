@@ -102,7 +102,7 @@ class ParserClass:
         "tipo_registro_decl : TYPE ID DPNTO NEWLINE LLE NEWLINE bloque_propiedades LLA"
         
         nombre = p[2]
-        props  = p[7]     # dict {campo:tipo}
+        props  = p[7]     
         if nombre in self.tipos_registro:
             raise SyntaxError(f"Registro '{nombre}' ya definido")
         self.tipos_registro[nombre] = props
@@ -550,7 +550,7 @@ class ParserClass:
         nombre = p[1]
         args   = p[3]  # lista de dicts {'tipo':…, 'valor':…}
 
-        # 1) ¿existe la función?
+        # 1) existe la función?
         if nombre not in self.func_prototypes:
             p[0] = f"Error: Función '{nombre}' no declarada"
             return
@@ -697,7 +697,7 @@ class ParserClass:
             return
         # 3) Extraer then-block (siempre en p[7])
         then_block = p[7]
-        # 4) ¿Hay else? Si p tiene más de 9 elementos, la alternativa larga fue usada
+        # 4) else
         if len(p) > 9:
             else_block = p[13]
         else:
@@ -797,9 +797,9 @@ class ParserClass:
 
 
     def p_lista_param(self, p):
-        """lista_param : empty
+        """lista_param :
                     | param_list"""
-        # si empty, devolvemos lista vacía
+        
         if p[1] is None:
             p[0] = []
         else:

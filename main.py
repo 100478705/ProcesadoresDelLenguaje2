@@ -4,12 +4,23 @@ from parser import ParserClass
 import traceback
 from lexer import LexerClass
 
-def guardar_tokens(archivo, ruta_salida='tokens.token'):
+def guardar_tokens(archivo):
+    """
+    Genera un .token con el mismo nombre base que el .symbol y .record.
+    Ejemplo: si archivo="test.c", creará "test.token".
+    """
+    # 1) Calculamos el nombre base sin extensión
+    base = os.path.splitext(archivo)[0]
+    # 2) Construimos la ruta de salida con extensión .token
+    ruta_salida = base + '.token'
+
+    # 3) Obtenemos el lexer
     lexer = LexerClass().lexerObj
     with open(archivo, 'r') as f:
         contenido = f.read()
         lexer.input(contenido)
 
+        # 4) Escribimos cada token en el nuevo fichero
         with open(ruta_salida, 'w') as out:
             for tok in lexer:
                 out.write(f"{tok.type} {tok.value}\n")
@@ -78,11 +89,11 @@ def analizar_parser(archivo):
 
         # 4) Escritura de registros
         if getattr(parser, 'tipos_registro', None) is not None:
-
             with open(base + '.record', 'w') as f_rec:
                 for nombre, props in parser.tipos_registro.items():
                     if isinstance(props, dict):
-                        campos = ','.join(props.keys())
+                        # Construimos "campo:tipo" para cada par
+                        campos = ','.join(f"{campo}:{tipo}" for campo, tipo in props.items())
                         f_rec.write(f"{nombre} : {campos}\n")
                     else:
                         print(f"Registro '{nombre}' ignorado: esperaba dict, obtuvo {type(props).__name__}")

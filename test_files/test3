@@ -1,2 +1,12 @@
-#error divison por 0
-/ 7 0
+#Vectores:
+
+
+int[2] a
+a[0]=5
+a[1]=6
+
+a[2]=0 #no funciona ya que esta fuera de rango
+a[1] = 1.1 # no funciona ya que es de tipo int el vector
+
+int length = a.len
+a[0] = a[1] + a[0]

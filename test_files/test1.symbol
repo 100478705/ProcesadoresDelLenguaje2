@@ -1,0 +1,7 @@
+x : int
+y : float
+z : char
+b : bool
+vec : vector
+p : Persona
+contador : int

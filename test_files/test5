@@ -1,26 +1,20 @@
-#comprobacion comentarios multilinea
-+ 3 4
 
-'''
+#Registros
 
-
-
-
-
-
+type Test:
+{
+    float a, b
+    char c
+}
 
 
+Test t
+t.a = 2.2
+t.b = -123
 
-'''
-- 7 4
-'''
-
-
-
-
-
-
+t.c = 'Á'
+t.a = 1 #No da error
+t.f = 1 #error, no declarado
+f.f = 2 #error, no encuentra el tipo
 
 
-''' 
-- 2 1

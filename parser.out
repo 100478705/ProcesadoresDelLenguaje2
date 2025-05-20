@@ -67,7 +67,7 @@ Rule 61    if_stmt -> IF expresion DPNTO NEWLINE LLE NEWLINE lista_sentencias LL
 Rule 62    if_stmt -> IF expresion DPNTO NEWLINE LLE NEWLINE lista_sentencias LLA ELSE DPNTO NEWLINE LLE NEWLINE lista_sentencias LLA
 Rule 63    while_stmt -> WHILE expresion DPNTO NEWLINE LLE NEWLINE lista_sentencias LLA
 Rule 64    function_decl -> DEF tipo ID PE lista_param PA DPNTO NEWLINE LLE NEWLINE push_scope lista_sentencias return_stmt pop_scope LLA
-Rule 65    lista_param -> empty
+Rule 65    lista_param -> <empty>
 Rule 66    lista_param -> param_list
 Rule 67    param_list -> param
 Rule 68    param_list -> param_list PNTOCOMA param
@@ -141,7 +141,7 @@ asignacion           : 5 24 26 28
 bloque_propiedades   : 13 15
 declaracion_variable : 4
 elem_registro        : 27 28
-empty                : 55 65
+empty                : 55
 expresion            : 6 22 23 23 24 25 27 29 29 30 30 31 31 32 32 33 33 34 34 35 35 36 36 37 37 38 38 39 39 40 41 42 43 44 45 46 47 57 58 59 61 62 63 70
 expresion_list       : 56 58
 function_decl        : 8
@@ -3885,9 +3885,8 @@ state 126
 state 127
 
     (64) function_decl -> DEF tipo ID PE . lista_param PA DPNTO NEWLINE LLE NEWLINE push_scope lista_sentencias return_stmt pop_scope LLA
-    (65) lista_param -> . empty
+    (65) lista_param -> .
     (66) lista_param -> . param_list
-    (82) empty -> .
     (67) param_list -> . param
     (68) param_list -> . param_list PNTOCOMA param
     (69) param -> . tipo ID
@@ -3901,7 +3900,7 @@ state 127
     (79) tipo_base -> . BOOL
     (71) registro_tipo -> . ID
 
-    PA              reduce using rule 82 (empty -> .)
+    PA              reduce using rule 65 (lista_param -> .)
     INT             shift and go to state 36
     FLOAT           shift and go to state 37
     CHAR            shift and go to state 38
@@ -3910,9 +3909,8 @@ state 127
 
     tipo                           shift and go to state 137
     lista_param                    shift and go to state 138
-    empty                          shift and go to state 139
-    param_list                     shift and go to state 140
-    param                          shift and go to state 141
+    param_list                     shift and go to state 139
+    param                          shift and go to state 140
     tipo_base                      shift and go to state 34
     registro_tipo                  shift and go to state 35
 
@@ -3921,14 +3919,14 @@ state 128
     (61) if_stmt -> IF expresion DPNTO NEWLINE . LLE NEWLINE lista_sentencias LLA
     (62) if_stmt -> IF expresion DPNTO NEWLINE . LLE NEWLINE lista_sentencias LLA ELSE DPNTO NEWLINE LLE NEWLINE lista_sentencias LLA
 
-    LLE             shift and go to state 142
+    LLE             shift and go to state 141
 
 
 state 129
 
     (63) while_stmt -> WHILE expresion DPNTO NEWLINE . LLE NEWLINE lista_sentencias LLA
 
-    LLE             shift and go to state 143
+    LLE             shift and go to state 142
 
 
 state 130
@@ -4000,8 +3998,8 @@ state 132
     FALSE           shift and go to state 28
     ID              shift and go to state 98
 
-    expresion                      shift and go to state 144
-    asignacion                     shift and go to state 145
+    expresion                      shift and go to state 143
+    asignacion                     shift and go to state 144
     elem_registro                  shift and go to state 15
 
 state 133
@@ -4021,7 +4019,7 @@ state 133
     (38) expresion -> expresion . MI expresion
     (39) expresion -> expresion . mI expresion
 
-    CA              shift and go to state 146
+    CA              shift and go to state 145
     SUM             shift and go to state 43
     RES             shift and go to state 44
     MUL             shift and go to state 45
@@ -4090,40 +4088,33 @@ state 136
 
     (13) tipo_registro_decl -> TYPE ID DPNTO NEWLINE LLE . NEWLINE bloque_propiedades LLA
 
-    NEWLINE         shift and go to state 147
+    NEWLINE         shift and go to state 146
 
 
 state 137
 
     (69) param -> tipo . ID
 
-    ID              shift and go to state 148
+    ID              shift and go to state 147
 
 
 state 138
 
     (64) function_decl -> DEF tipo ID PE lista_param . PA DPNTO NEWLINE LLE NEWLINE push_scope lista_sentencias return_stmt pop_scope LLA
 
-    PA              shift and go to state 149
+    PA              shift and go to state 148
 
 
 state 139
-
-    (65) lista_param -> empty .
-
-    PA              reduce using rule 65 (lista_param -> empty .)
-
-
-state 140
 
     (66) lista_param -> param_list .
     (68) param_list -> param_list . PNTOCOMA param
 
     PA              reduce using rule 66 (lista_param -> param_list .)
-    PNTOCOMA        shift and go to state 150
+    PNTOCOMA        shift and go to state 149
 
 
-state 141
+state 140
 
     (67) param_list -> param .
 
@@ -4131,22 +4122,22 @@ state 141
     PA              reduce using rule 67 (param_list -> param .)
 
 
-state 142
+state 141
 
     (61) if_stmt -> IF expresion DPNTO NEWLINE LLE . NEWLINE lista_sentencias LLA
     (62) if_stmt -> IF expresion DPNTO NEWLINE LLE . NEWLINE lista_sentencias LLA ELSE DPNTO NEWLINE LLE NEWLINE lista_sentencias LLA
+
+    NEWLINE         shift and go to state 150
+
+
+state 142
+
+    (63) while_stmt -> WHILE expresion DPNTO NEWLINE LLE . NEWLINE lista_sentencias LLA
 
     NEWLINE         shift and go to state 151
 
 
 state 143
-
-    (63) while_stmt -> WHILE expresion DPNTO NEWLINE LLE . NEWLINE lista_sentencias LLA
-
-    NEWLINE         shift and go to state 152
-
-
-state 144
 
     (23) asignacion -> ID CE expresion CA EQ expresion .
     (29) expresion -> expresion . SUM expresion
@@ -4175,14 +4166,14 @@ state 144
     mI              shift and go to state 53
 
 
-state 145
+state 144
 
     (24) asignacion -> ID CE expresion CA EQ asignacion .
 
     NEWLINE         reduce using rule 24 (asignacion -> ID CE expresion CA EQ asignacion .)
 
 
-state 146
+state 145
 
     (59) expresion -> ID CE expresion CA .
     (23) asignacion -> ID CE expresion CA . EQ expresion
@@ -4203,7 +4194,7 @@ state 146
     EQ              shift and go to state 132
 
 
-state 147
+state 146
 
     (13) tipo_registro_decl -> TYPE ID DPNTO NEWLINE LLE NEWLINE . bloque_propiedades LLA
     (15) bloque_propiedades -> . propiedad NEWLINE bloque_propiedades
@@ -4225,13 +4216,13 @@ state 147
     BOOL            shift and go to state 39
     ID              shift and go to state 78
 
-    bloque_propiedades             shift and go to state 153
-    propiedad                      shift and go to state 154
-    tipo                           shift and go to state 155
+    bloque_propiedades             shift and go to state 152
+    propiedad                      shift and go to state 153
+    tipo                           shift and go to state 154
     tipo_base                      shift and go to state 34
     registro_tipo                  shift and go to state 35
 
-state 148
+state 147
 
     (69) param -> tipo ID .
 
@@ -4239,14 +4230,14 @@ state 148
     PA              reduce using rule 69 (param -> tipo ID .)
 
 
-state 149
+state 148
 
     (64) function_decl -> DEF tipo ID PE lista_param PA . DPNTO NEWLINE LLE NEWLINE push_scope lista_sentencias return_stmt pop_scope LLA
 
-    DPNTO           shift and go to state 156
+    DPNTO           shift and go to state 155
 
 
-state 150
+state 149
 
     (68) param_list -> param_list PNTOCOMA . param
     (69) param -> . tipo ID
@@ -4266,15 +4257,49 @@ state 150
     BOOL            shift and go to state 39
     ID              shift and go to state 78
 
-    param                          shift and go to state 157
+    param                          shift and go to state 156
     tipo                           shift and go to state 137
     tipo_base                      shift and go to state 34
     registro_tipo                  shift and go to state 35
 
-state 151
+state 150
 
     (61) if_stmt -> IF expresion DPNTO NEWLINE LLE NEWLINE . lista_sentencias LLA
     (62) if_stmt -> IF expresion DPNTO NEWLINE LLE NEWLINE . lista_sentencias LLA ELSE DPNTO NEWLINE LLE NEWLINE lista_sentencias LLA
+    (2) lista_sentencias -> .
+    (3) lista_sentencias -> . lista_sentencias sentencia
+
+    LLA             reduce using rule 2 (lista_sentencias -> .)
+    NEWLINE         reduce using rule 2 (lista_sentencias -> .)
+    ID              reduce using rule 2 (lista_sentencias -> .)
+    RES             reduce using rule 2 (lista_sentencias -> .)
+    SUM             reduce using rule 2 (lista_sentencias -> .)
+    NOT             reduce using rule 2 (lista_sentencias -> .)
+    COS             reduce using rule 2 (lista_sentencias -> .)
+    SEN             reduce using rule 2 (lista_sentencias -> .)
+    LOG             reduce using rule 2 (lista_sentencias -> .)
+    EXP             reduce using rule 2 (lista_sentencias -> .)
+    PE              reduce using rule 2 (lista_sentencias -> .)
+    ENTERO          reduce using rule 2 (lista_sentencias -> .)
+    REAL            reduce using rule 2 (lista_sentencias -> .)
+    CARACTER        reduce using rule 2 (lista_sentencias -> .)
+    TRUE            reduce using rule 2 (lista_sentencias -> .)
+    FALSE           reduce using rule 2 (lista_sentencias -> .)
+    TYPE            reduce using rule 2 (lista_sentencias -> .)
+    DEF             reduce using rule 2 (lista_sentencias -> .)
+    IF              reduce using rule 2 (lista_sentencias -> .)
+    WHILE           reduce using rule 2 (lista_sentencias -> .)
+    RETURN          reduce using rule 2 (lista_sentencias -> .)
+    INT             reduce using rule 2 (lista_sentencias -> .)
+    FLOAT           reduce using rule 2 (lista_sentencias -> .)
+    CHAR            reduce using rule 2 (lista_sentencias -> .)
+    BOOL            reduce using rule 2 (lista_sentencias -> .)
+
+    lista_sentencias               shift and go to state 157
+
+state 151
+
+    (63) while_stmt -> WHILE expresion DPNTO NEWLINE LLE NEWLINE . lista_sentencias LLA
     (2) lista_sentencias -> .
     (3) lista_sentencias -> . lista_sentencias sentencia
 
@@ -4308,54 +4333,20 @@ state 151
 
 state 152
 
-    (63) while_stmt -> WHILE expresion DPNTO NEWLINE LLE NEWLINE . lista_sentencias LLA
-    (2) lista_sentencias -> .
-    (3) lista_sentencias -> . lista_sentencias sentencia
-
-    LLA             reduce using rule 2 (lista_sentencias -> .)
-    NEWLINE         reduce using rule 2 (lista_sentencias -> .)
-    ID              reduce using rule 2 (lista_sentencias -> .)
-    RES             reduce using rule 2 (lista_sentencias -> .)
-    SUM             reduce using rule 2 (lista_sentencias -> .)
-    NOT             reduce using rule 2 (lista_sentencias -> .)
-    COS             reduce using rule 2 (lista_sentencias -> .)
-    SEN             reduce using rule 2 (lista_sentencias -> .)
-    LOG             reduce using rule 2 (lista_sentencias -> .)
-    EXP             reduce using rule 2 (lista_sentencias -> .)
-    PE              reduce using rule 2 (lista_sentencias -> .)
-    ENTERO          reduce using rule 2 (lista_sentencias -> .)
-    REAL            reduce using rule 2 (lista_sentencias -> .)
-    CARACTER        reduce using rule 2 (lista_sentencias -> .)
-    TRUE            reduce using rule 2 (lista_sentencias -> .)
-    FALSE           reduce using rule 2 (lista_sentencias -> .)
-    TYPE            reduce using rule 2 (lista_sentencias -> .)
-    DEF             reduce using rule 2 (lista_sentencias -> .)
-    IF              reduce using rule 2 (lista_sentencias -> .)
-    WHILE           reduce using rule 2 (lista_sentencias -> .)
-    RETURN          reduce using rule 2 (lista_sentencias -> .)
-    INT             reduce using rule 2 (lista_sentencias -> .)
-    FLOAT           reduce using rule 2 (lista_sentencias -> .)
-    CHAR            reduce using rule 2 (lista_sentencias -> .)
-    BOOL            reduce using rule 2 (lista_sentencias -> .)
-
-    lista_sentencias               shift and go to state 159
-
-state 153
-
     (13) tipo_registro_decl -> TYPE ID DPNTO NEWLINE LLE NEWLINE bloque_propiedades . LLA
 
-    LLA             shift and go to state 160
+    LLA             shift and go to state 159
 
 
-state 154
+state 153
 
     (15) bloque_propiedades -> propiedad . NEWLINE bloque_propiedades
     (16) bloque_propiedades -> propiedad . NEWLINE
 
-    NEWLINE         shift and go to state 161
+    NEWLINE         shift and go to state 160
 
 
-state 155
+state 154
 
     (17) propiedad -> tipo . lista_identificadores
     (18) lista_identificadores -> . ID
@@ -4363,16 +4354,16 @@ state 155
 
     ID              shift and go to state 61
 
-    lista_identificadores          shift and go to state 162
+    lista_identificadores          shift and go to state 161
 
-state 156
+state 155
 
     (64) function_decl -> DEF tipo ID PE lista_param PA DPNTO . NEWLINE LLE NEWLINE push_scope lista_sentencias return_stmt pop_scope LLA
 
-    NEWLINE         shift and go to state 163
+    NEWLINE         shift and go to state 162
 
 
-state 157
+state 156
 
     (68) param_list -> param_list PNTOCOMA param .
 
@@ -4380,10 +4371,115 @@ state 157
     PA              reduce using rule 68 (param_list -> param_list PNTOCOMA param .)
 
 
-state 158
+state 157
 
     (61) if_stmt -> IF expresion DPNTO NEWLINE LLE NEWLINE lista_sentencias . LLA
     (62) if_stmt -> IF expresion DPNTO NEWLINE LLE NEWLINE lista_sentencias . LLA ELSE DPNTO NEWLINE LLE NEWLINE lista_sentencias LLA
+    (3) lista_sentencias -> lista_sentencias . sentencia
+    (4) sentencia -> . declaracion_variable NEWLINE
+    (5) sentencia -> . asignacion NEWLINE
+    (6) sentencia -> . expresion NEWLINE
+    (7) sentencia -> . tipo_registro_decl NEWLINE
+    (8) sentencia -> . function_decl NEWLINE
+    (9) sentencia -> . if_stmt NEWLINE
+    (10) sentencia -> . while_stmt NEWLINE
+    (11) sentencia -> . return_stmt NEWLINE
+    (12) sentencia -> . NEWLINE
+    (20) declaracion_variable -> . tipo lista_declaraciones
+    (23) asignacion -> . ID CE expresion CA EQ expresion
+    (24) asignacion -> . ID CE expresion CA EQ asignacion
+    (25) asignacion -> . ID EQ expresion
+    (26) asignacion -> . ID EQ asignacion
+    (27) asignacion -> . elem_registro EQ expresion
+    (28) asignacion -> . elem_registro EQ asignacion
+    (29) expresion -> . expresion SUM expresion
+    (30) expresion -> . expresion RES expresion
+    (31) expresion -> . expresion MUL expresion
+    (32) expresion -> . expresion DIV expresion
+    (33) expresion -> . expresion AND expresion
+    (34) expresion -> . expresion OR expresion
+    (35) expresion -> . expresion I expresion
+    (36) expresion -> . expresion M expresion
+    (37) expresion -> . expresion m expresion
+    (38) expresion -> . expresion MI expresion
+    (39) expresion -> . expresion mI expresion
+    (40) expresion -> . RES expresion
+    (41) expresion -> . SUM expresion
+    (42) expresion -> . NOT expresion
+    (43) expresion -> . COS expresion
+    (44) expresion -> . SEN expresion
+    (45) expresion -> . LOG expresion
+    (46) expresion -> . EXP expresion
+    (47) expresion -> . PE expresion PA
+    (48) expresion -> . ENTERO
+    (49) expresion -> . REAL
+    (50) expresion -> . CARACTER
+    (51) expresion -> . TRUE
+    (52) expresion -> . FALSE
+    (53) expresion -> . ID
+    (54) expresion -> . ID PE lista_expresiones PA
+    (59) expresion -> . ID CE expresion CA
+    (60) expresion -> . ID PNTO LEN
+    (13) tipo_registro_decl -> . TYPE ID DPNTO NEWLINE LLE NEWLINE bloque_propiedades LLA
+    (64) function_decl -> . DEF tipo ID PE lista_param PA DPNTO NEWLINE LLE NEWLINE push_scope lista_sentencias return_stmt pop_scope LLA
+    (61) if_stmt -> . IF expresion DPNTO NEWLINE LLE NEWLINE lista_sentencias LLA
+    (62) if_stmt -> . IF expresion DPNTO NEWLINE LLE NEWLINE lista_sentencias LLA ELSE DPNTO NEWLINE LLE NEWLINE lista_sentencias LLA
+    (63) while_stmt -> . WHILE expresion DPNTO NEWLINE LLE NEWLINE lista_sentencias LLA
+    (70) return_stmt -> . RETURN expresion NEWLINE
+    (72) tipo -> . tipo_base
+    (73) tipo -> . tipo_base CE ENTERO CA
+    (74) tipo -> . registro_tipo
+    (75) tipo -> . registro_tipo CE ENTERO CA
+    (14) elem_registro -> . ID PNTO ID
+    (76) tipo_base -> . INT
+    (77) tipo_base -> . FLOAT
+    (78) tipo_base -> . CHAR
+    (79) tipo_base -> . BOOL
+    (71) registro_tipo -> . ID
+
+    LLA             shift and go to state 163
+    NEWLINE         shift and go to state 5
+    ID              shift and go to state 14
+    RES             shift and go to state 17
+    SUM             shift and go to state 16
+    NOT             shift and go to state 18
+    COS             shift and go to state 19
+    SEN             shift and go to state 20
+    LOG             shift and go to state 21
+    EXP             shift and go to state 22
+    PE              shift and go to state 23
+    ENTERO          shift and go to state 24
+    REAL            shift and go to state 25
+    CARACTER        shift and go to state 26
+    TRUE            shift and go to state 27
+    FALSE           shift and go to state 28
+    TYPE            shift and go to state 29
+    DEF             shift and go to state 30
+    IF              shift and go to state 31
+    WHILE           shift and go to state 32
+    RETURN          shift and go to state 33
+    INT             shift and go to state 36
+    FLOAT           shift and go to state 37
+    CHAR            shift and go to state 38
+    BOOL            shift and go to state 39
+
+    expresion                      shift and go to state 7
+    sentencia                      shift and go to state 3
+    declaracion_variable           shift and go to state 4
+    asignacion                     shift and go to state 6
+    tipo_registro_decl             shift and go to state 8
+    function_decl                  shift and go to state 9
+    if_stmt                        shift and go to state 10
+    while_stmt                     shift and go to state 11
+    return_stmt                    shift and go to state 12
+    tipo                           shift and go to state 13
+    elem_registro                  shift and go to state 15
+    tipo_base                      shift and go to state 34
+    registro_tipo                  shift and go to state 35
+
+state 158
+
+    (63) while_stmt -> WHILE expresion DPNTO NEWLINE LLE NEWLINE lista_sentencias . LLA
     (3) lista_sentencias -> lista_sentencias . sentencia
     (4) sentencia -> . declaracion_variable NEWLINE
     (5) sentencia -> . asignacion NEWLINE
@@ -4488,117 +4584,12 @@ state 158
 
 state 159
 
-    (63) while_stmt -> WHILE expresion DPNTO NEWLINE LLE NEWLINE lista_sentencias . LLA
-    (3) lista_sentencias -> lista_sentencias . sentencia
-    (4) sentencia -> . declaracion_variable NEWLINE
-    (5) sentencia -> . asignacion NEWLINE
-    (6) sentencia -> . expresion NEWLINE
-    (7) sentencia -> . tipo_registro_decl NEWLINE
-    (8) sentencia -> . function_decl NEWLINE
-    (9) sentencia -> . if_stmt NEWLINE
-    (10) sentencia -> . while_stmt NEWLINE
-    (11) sentencia -> . return_stmt NEWLINE
-    (12) sentencia -> . NEWLINE
-    (20) declaracion_variable -> . tipo lista_declaraciones
-    (23) asignacion -> . ID CE expresion CA EQ expresion
-    (24) asignacion -> . ID CE expresion CA EQ asignacion
-    (25) asignacion -> . ID EQ expresion
-    (26) asignacion -> . ID EQ asignacion
-    (27) asignacion -> . elem_registro EQ expresion
-    (28) asignacion -> . elem_registro EQ asignacion
-    (29) expresion -> . expresion SUM expresion
-    (30) expresion -> . expresion RES expresion
-    (31) expresion -> . expresion MUL expresion
-    (32) expresion -> . expresion DIV expresion
-    (33) expresion -> . expresion AND expresion
-    (34) expresion -> . expresion OR expresion
-    (35) expresion -> . expresion I expresion
-    (36) expresion -> . expresion M expresion
-    (37) expresion -> . expresion m expresion
-    (38) expresion -> . expresion MI expresion
-    (39) expresion -> . expresion mI expresion
-    (40) expresion -> . RES expresion
-    (41) expresion -> . SUM expresion
-    (42) expresion -> . NOT expresion
-    (43) expresion -> . COS expresion
-    (44) expresion -> . SEN expresion
-    (45) expresion -> . LOG expresion
-    (46) expresion -> . EXP expresion
-    (47) expresion -> . PE expresion PA
-    (48) expresion -> . ENTERO
-    (49) expresion -> . REAL
-    (50) expresion -> . CARACTER
-    (51) expresion -> . TRUE
-    (52) expresion -> . FALSE
-    (53) expresion -> . ID
-    (54) expresion -> . ID PE lista_expresiones PA
-    (59) expresion -> . ID CE expresion CA
-    (60) expresion -> . ID PNTO LEN
-    (13) tipo_registro_decl -> . TYPE ID DPNTO NEWLINE LLE NEWLINE bloque_propiedades LLA
-    (64) function_decl -> . DEF tipo ID PE lista_param PA DPNTO NEWLINE LLE NEWLINE push_scope lista_sentencias return_stmt pop_scope LLA
-    (61) if_stmt -> . IF expresion DPNTO NEWLINE LLE NEWLINE lista_sentencias LLA
-    (62) if_stmt -> . IF expresion DPNTO NEWLINE LLE NEWLINE lista_sentencias LLA ELSE DPNTO NEWLINE LLE NEWLINE lista_sentencias LLA
-    (63) while_stmt -> . WHILE expresion DPNTO NEWLINE LLE NEWLINE lista_sentencias LLA
-    (70) return_stmt -> . RETURN expresion NEWLINE
-    (72) tipo -> . tipo_base
-    (73) tipo -> . tipo_base CE ENTERO CA
-    (74) tipo -> . registro_tipo
-    (75) tipo -> . registro_tipo CE ENTERO CA
-    (14) elem_registro -> . ID PNTO ID
-    (76) tipo_base -> . INT
-    (77) tipo_base -> . FLOAT
-    (78) tipo_base -> . CHAR
-    (79) tipo_base -> . BOOL
-    (71) registro_tipo -> . ID
-
-    LLA             shift and go to state 165
-    NEWLINE         shift and go to state 5
-    ID              shift and go to state 14
-    RES             shift and go to state 17
-    SUM             shift and go to state 16
-    NOT             shift and go to state 18
-    COS             shift and go to state 19
-    SEN             shift and go to state 20
-    LOG             shift and go to state 21
-    EXP             shift and go to state 22
-    PE              shift and go to state 23
-    ENTERO          shift and go to state 24
-    REAL            shift and go to state 25
-    CARACTER        shift and go to state 26
-    TRUE            shift and go to state 27
-    FALSE           shift and go to state 28
-    TYPE            shift and go to state 29
-    DEF             shift and go to state 30
-    IF              shift and go to state 31
-    WHILE           shift and go to state 32
-    RETURN          shift and go to state 33
-    INT             shift and go to state 36
-    FLOAT           shift and go to state 37
-    CHAR            shift and go to state 38
-    BOOL            shift and go to state 39
-
-    expresion                      shift and go to state 7
-    sentencia                      shift and go to state 3
-    declaracion_variable           shift and go to state 4
-    asignacion                     shift and go to state 6
-    tipo_registro_decl             shift and go to state 8
-    function_decl                  shift and go to state 9
-    if_stmt                        shift and go to state 10
-    while_stmt                     shift and go to state 11
-    return_stmt                    shift and go to state 12
-    tipo                           shift and go to state 13
-    elem_registro                  shift and go to state 15
-    tipo_base                      shift and go to state 34
-    registro_tipo                  shift and go to state 35
-
-state 160
-
     (13) tipo_registro_decl -> TYPE ID DPNTO NEWLINE LLE NEWLINE bloque_propiedades LLA .
 
     NEWLINE         reduce using rule 13 (tipo_registro_decl -> TYPE ID DPNTO NEWLINE LLE NEWLINE bloque_propiedades LLA .)
 
 
-state 161
+state 160
 
     (15) bloque_propiedades -> propiedad NEWLINE . bloque_propiedades
     (16) bloque_propiedades -> propiedad NEWLINE .
@@ -4622,64 +4613,64 @@ state 161
     BOOL            shift and go to state 39
     ID              shift and go to state 78
 
-    propiedad                      shift and go to state 154
-    bloque_propiedades             shift and go to state 166
-    tipo                           shift and go to state 155
+    propiedad                      shift and go to state 153
+    bloque_propiedades             shift and go to state 165
+    tipo                           shift and go to state 154
     tipo_base                      shift and go to state 34
     registro_tipo                  shift and go to state 35
 
-state 162
+state 161
 
     (17) propiedad -> tipo lista_identificadores .
 
     NEWLINE         reduce using rule 17 (propiedad -> tipo lista_identificadores .)
 
 
-state 163
+state 162
 
     (64) function_decl -> DEF tipo ID PE lista_param PA DPNTO NEWLINE . LLE NEWLINE push_scope lista_sentencias return_stmt pop_scope LLA
 
-    LLE             shift and go to state 167
+    LLE             shift and go to state 166
 
 
-state 164
+state 163
 
     (61) if_stmt -> IF expresion DPNTO NEWLINE LLE NEWLINE lista_sentencias LLA .
     (62) if_stmt -> IF expresion DPNTO NEWLINE LLE NEWLINE lista_sentencias LLA . ELSE DPNTO NEWLINE LLE NEWLINE lista_sentencias LLA
 
     NEWLINE         reduce using rule 61 (if_stmt -> IF expresion DPNTO NEWLINE LLE NEWLINE lista_sentencias LLA .)
-    ELSE            shift and go to state 168
+    ELSE            shift and go to state 167
 
 
-state 165
+state 164
 
     (63) while_stmt -> WHILE expresion DPNTO NEWLINE LLE NEWLINE lista_sentencias LLA .
 
     NEWLINE         reduce using rule 63 (while_stmt -> WHILE expresion DPNTO NEWLINE LLE NEWLINE lista_sentencias LLA .)
 
 
-state 166
+state 165
 
     (15) bloque_propiedades -> propiedad NEWLINE bloque_propiedades .
 
     LLA             reduce using rule 15 (bloque_propiedades -> propiedad NEWLINE bloque_propiedades .)
 
 
-state 167
+state 166
 
     (64) function_decl -> DEF tipo ID PE lista_param PA DPNTO NEWLINE LLE . NEWLINE push_scope lista_sentencias return_stmt pop_scope LLA
 
-    NEWLINE         shift and go to state 169
+    NEWLINE         shift and go to state 168
 
 
-state 168
+state 167
 
     (62) if_stmt -> IF expresion DPNTO NEWLINE LLE NEWLINE lista_sentencias LLA ELSE . DPNTO NEWLINE LLE NEWLINE lista_sentencias LLA
 
-    DPNTO           shift and go to state 170
+    DPNTO           shift and go to state 169
 
 
-state 169
+state 168
 
     (64) function_decl -> DEF tipo ID PE lista_param PA DPNTO NEWLINE LLE NEWLINE . push_scope lista_sentencias return_stmt pop_scope LLA
     (80) push_scope -> .
@@ -4709,16 +4700,16 @@ state 169
     CHAR            reduce using rule 80 (push_scope -> .)
     BOOL            reduce using rule 80 (push_scope -> .)
 
-    push_scope                     shift and go to state 171
+    push_scope                     shift and go to state 170
 
-state 170
+state 169
 
     (62) if_stmt -> IF expresion DPNTO NEWLINE LLE NEWLINE lista_sentencias LLA ELSE DPNTO . NEWLINE LLE NEWLINE lista_sentencias LLA
 
-    NEWLINE         shift and go to state 172
+    NEWLINE         shift and go to state 171
 
 
-state 171
+state 170
 
     (64) function_decl -> DEF tipo ID PE lista_param PA DPNTO NEWLINE LLE NEWLINE push_scope . lista_sentencias return_stmt pop_scope LLA
     (2) lista_sentencias -> .
@@ -4749,16 +4740,16 @@ state 171
     CHAR            reduce using rule 2 (lista_sentencias -> .)
     BOOL            reduce using rule 2 (lista_sentencias -> .)
 
-    lista_sentencias               shift and go to state 173
+    lista_sentencias               shift and go to state 172
 
-state 172
+state 171
 
     (62) if_stmt -> IF expresion DPNTO NEWLINE LLE NEWLINE lista_sentencias LLA ELSE DPNTO NEWLINE . LLE NEWLINE lista_sentencias LLA
 
-    LLE             shift and go to state 174
+    LLE             shift and go to state 173
 
 
-state 173
+state 172
 
     (64) function_decl -> DEF tipo ID PE lista_param PA DPNTO NEWLINE LLE NEWLINE push_scope lista_sentencias . return_stmt pop_scope LLA
     (3) lista_sentencias -> lista_sentencias . sentencia
@@ -4849,7 +4840,7 @@ state 173
     BOOL            shift and go to state 39
 
     tipo                           shift and go to state 13
-    return_stmt                    shift and go to state 175
+    return_stmt                    shift and go to state 174
     sentencia                      shift and go to state 3
     expresion                      shift and go to state 7
     declaracion_variable           shift and go to state 4
@@ -4862,14 +4853,14 @@ state 173
     tipo_base                      shift and go to state 34
     registro_tipo                  shift and go to state 35
 
-state 174
+state 173
 
     (62) if_stmt -> IF expresion DPNTO NEWLINE LLE NEWLINE lista_sentencias LLA ELSE DPNTO NEWLINE LLE . NEWLINE lista_sentencias LLA
 
-    NEWLINE         shift and go to state 176
+    NEWLINE         shift and go to state 175
 
 
-state 175
+state 174
 
     (64) function_decl -> DEF tipo ID PE lista_param PA DPNTO NEWLINE LLE NEWLINE push_scope lista_sentencias return_stmt . pop_scope LLA
     (11) sentencia -> return_stmt . NEWLINE
@@ -4878,9 +4869,9 @@ state 175
     NEWLINE         shift and go to state 58
     LLA             reduce using rule 81 (pop_scope -> .)
 
-    pop_scope                      shift and go to state 177
+    pop_scope                      shift and go to state 176
 
-state 176
+state 175
 
     (62) if_stmt -> IF expresion DPNTO NEWLINE LLE NEWLINE lista_sentencias LLA ELSE DPNTO NEWLINE LLE NEWLINE . lista_sentencias LLA
     (2) lista_sentencias -> .
@@ -4912,16 +4903,16 @@ state 176
     CHAR            reduce using rule 2 (lista_sentencias -> .)
     BOOL            reduce using rule 2 (lista_sentencias -> .)
 
-    lista_sentencias               shift and go to state 178
+    lista_sentencias               shift and go to state 177
 
-state 177
+state 176
 
     (64) function_decl -> DEF tipo ID PE lista_param PA DPNTO NEWLINE LLE NEWLINE push_scope lista_sentencias return_stmt pop_scope . LLA
 
-    LLA             shift and go to state 179
+    LLA             shift and go to state 178
 
 
-state 178
+state 177
 
     (62) if_stmt -> IF expresion DPNTO NEWLINE LLE NEWLINE lista_sentencias LLA ELSE DPNTO NEWLINE LLE NEWLINE lista_sentencias . LLA
     (3) lista_sentencias -> lista_sentencias . sentencia
@@ -4986,7 +4977,7 @@ state 178
     (79) tipo_base -> . BOOL
     (71) registro_tipo -> . ID
 
-    LLA             shift and go to state 180
+    LLA             shift and go to state 179
     NEWLINE         shift and go to state 5
     ID              shift and go to state 14
     RES             shift and go to state 17
@@ -5026,14 +5017,14 @@ state 178
     tipo_base                      shift and go to state 34
     registro_tipo                  shift and go to state 35
 
-state 179
+state 178
 
     (64) function_decl -> DEF tipo ID PE lista_param PA DPNTO NEWLINE LLE NEWLINE push_scope lista_sentencias return_stmt pop_scope LLA .
 
     NEWLINE         reduce using rule 64 (function_decl -> DEF tipo ID PE lista_param PA DPNTO NEWLINE LLE NEWLINE push_scope lista_sentencias return_stmt pop_scope LLA .)
 
 
-state 180
+state 179
 
     (62) if_stmt -> IF expresion DPNTO NEWLINE LLE NEWLINE lista_sentencias LLA ELSE DPNTO NEWLINE LLE NEWLINE lista_sentencias LLA .
 
