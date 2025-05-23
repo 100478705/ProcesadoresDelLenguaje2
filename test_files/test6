@@ -11,4 +11,5 @@ def int func ( int a ):
 }
 
 int resultado = func(12) 
+bool resultado2 = func(12)  # Dará error por tipo de resultado 2
 

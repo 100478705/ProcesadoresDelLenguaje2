@@ -6,7 +6,7 @@ bool flag = true
 def int foo() :
 {
     int x = 1 
-    x = x + 1       # → 11, OK
+    x = x + 1     
     return x
 }
 
@@ -14,12 +14,12 @@ def int foo() :
 def int bar(int x) :
 {
     int b = 2
-    int x = 2       # modifica el parámetro local, no la global
+    int x = 2       
     return x
 }
 
 # llamadas y usos en global tras las funciones
-int result1 = foo()        # result1 debe ser 11
-int result2 = bar(x)       # result2 = 5*2 = 10
-x = x + 1                  # x global pasa de 5 a 6
+int result1 = foo()     
+int result2 = bar(x)      
+x = x + 1                  
 
